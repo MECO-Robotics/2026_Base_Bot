@@ -29,6 +29,13 @@ public class DriveConstants {
           : 100.0; // If both Azimuth and Drive use CANFD, sample odometry at 250 Hz, if either loop
   // is not FD, sample odometry at 100 Hz
 
+    //NavX's highest allowed odometry frequency is now 200, this change reflects that
+  public static final double navXFrequency =
+      new CANBus(DriveMotorConstants.canBusName).isNetworkFD()
+              && new CANBus(AzimuthMotorConstants.canBusName).isNetworkFD()
+          ? 200.0
+          : 100.0;
+
   public static final double trackWidth = Units.inchesToMeters(26.5);
   public static final double wheelBase = Units.inchesToMeters(26.5);
   public static final double driveBaseRadius = Math.hypot(wheelBase / 2.0, wheelBase / 2.0);
