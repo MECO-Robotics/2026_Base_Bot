@@ -8,6 +8,19 @@ FRC Robot Code has gotten significantly more advanced in recent years with brush
 2. Pull your fork
 3. Split up your robot into different subsystems (Check out the [Subsystems](#subsystems) section)
 
+## Documentation
+
+This repository now includes a Sphinx documentation site under `docs/` using the
+[Furo theme](https://github.com/pradyunsg/furo).
+
+Build it locally with:
+
+```powershell
+cd docs
+py -m pip install -r requirements.txt
+py -m sphinx -b html source build/html
+```
+
 
 ## Subsystems
 
