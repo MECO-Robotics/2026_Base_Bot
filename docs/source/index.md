@@ -3,6 +3,9 @@
 This site documents the base FRC robot project in this repository and uses the
 [Furo theme](https://github.com/pradyunsg/furo) for a clean, navigable reference.
 
+If you are new to the codebase, start with {doc}`getting-started`. It is written
+as a first-pass adoption guide, not just an API reference.
+
 ```{toctree}
 :maxdepth: 2
 :caption: Docs
@@ -20,8 +23,9 @@ customizing
 - Reusable IO-backed subsystem patterns for flywheels, joints, sensors, piece detection, and vision.
 - Real, sim, and replay execution modes so development is not blocked on hardware.
 
-## Read this first
+## Recommended reading order
 
-If you are adopting this repo for a season robot, start with
-{doc}`getting-started`, then move to {doc}`architecture` before creating new
-subsystems or commands.
+1. {doc}`getting-started`
+2. {doc}`architecture`
+3. {doc}`subsystems`
+4. {doc}`customizing`

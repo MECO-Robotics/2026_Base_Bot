@@ -23,16 +23,6 @@ html_css_files = ["custom.css"]
 
 html_theme_options = {
     "navigation_with_keys": True,
-    "light_css_variables": {
-        "color-brand-primary": "#0f766e",
-        "color-brand-content": "#0f766e",
-        "color-api-name": "#14532d",
-        "color-api-pre-name": "#14532d",
-    },
-    "dark_css_variables": {
-        "color-brand-primary": "#5eead4",
-        "color-brand-content": "#5eead4",
-    },
     "footer_icons": [
         {
             "name": "Furo",
