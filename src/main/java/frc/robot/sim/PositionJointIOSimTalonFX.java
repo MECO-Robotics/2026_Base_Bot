@@ -1,4 +1,4 @@
-package frc.robot.subsystems.position_joint.sim;
+package frc.robot.sim;
 
 import static edu.wpi.first.units.Units.Rotations;
 import static edu.wpi.first.units.Units.RotationsPerSecond;
@@ -13,7 +13,7 @@ import frc.robot.subsystems.position_joint.PositionJointIO;
 import frc.robot.util.feedforwards.PositionJointFeedforward;
 import frc.robot.util.feedforwards.TunableElevatorFeedforward;
 
-public class PositionJointIOSimSparkMax implements PositionJointIO {
+public class PositionJointIOSimTalonFX implements PositionJointIO {
   private final String name;
   private final PositionJointHardwareConfig config;
   private final DCMotorSim sim;
@@ -27,7 +27,7 @@ public class PositionJointIOSimSparkMax implements PositionJointIO {
   private double positionSetpoint = 0.0;
   private double velocitySetpoint = 0.0;
 
-  public PositionJointIOSimSparkMax(
+  public PositionJointIOSimTalonFX(
       String name, PositionJointHardwareConfig config, DCMotor simMotorModel) {
     this.name = name;
     this.config = config;

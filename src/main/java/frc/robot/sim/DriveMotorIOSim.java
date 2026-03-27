@@ -1,4 +1,4 @@
-package frc.robot.subsystems.drive.drive_motor.sim;
+package frc.robot.sim;
 
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 

@@ -1,4 +1,4 @@
-package frc.robot.subsystems.drive.azimuth_motor.sim;
+package frc.robot.sim;
 
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 

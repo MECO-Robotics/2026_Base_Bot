@@ -1,4 +1,4 @@
-package frc.robot.subsystems.flywheel.sim;
+package frc.robot.sim;
 
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 import static edu.wpi.first.units.Units.RotationsPerSecondPerSecond;
