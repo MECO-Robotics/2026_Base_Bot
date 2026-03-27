@@ -1,4 +1,4 @@
-package frc.robot.subsystems.drive.drive_motor;
+package frc.robot.subsystems.drive.drive_motor.sim;
 
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 
@@ -11,6 +11,7 @@ import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import frc.robot.constants.drive.DriveMotorConstants.DriveMotorGains;
 import frc.robot.constants.drive.DriveMotorConstants.DriveMotorHardwareConfig;
+import frc.robot.subsystems.drive.drive_motor.DriveMotorIO;
 import frc.robot.util.feedforwards.TunableSimpleMotorFeedforward;
 
 /**

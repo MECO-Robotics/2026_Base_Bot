@@ -1,4 +1,4 @@
-package frc.robot.subsystems.drive.azimuth_motor;
+package frc.robot.subsystems.drive.azimuth_motor.sim;
 
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 
@@ -11,6 +11,7 @@ import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import frc.robot.constants.drive.AzimuthMotorConstants.AzimuthMotorGains;
 import frc.robot.constants.drive.AzimuthMotorConstants.AzimuthMotorHardwareConfig;
+import frc.robot.subsystems.drive.azimuth_motor.AzimuthMotorIO;
 import frc.robot.util.feedforwards.TunableSimpleMotorFeedforward;
 
 /**
