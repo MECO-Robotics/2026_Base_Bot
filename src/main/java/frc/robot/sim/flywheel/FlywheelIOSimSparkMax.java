@@ -1,4 +1,4 @@
-package frc.robot.subsystems.flywheel;
+package frc.robot.sim.flywheel;
 
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 import static edu.wpi.first.units.Units.RotationsPerSecondPerSecond;
@@ -9,9 +9,10 @@ import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
 import frc.robot.constants.types.FlywheelConstants.FlywheelGains;
 import frc.robot.constants.types.FlywheelConstants.FlywheelHardwareConfig;
+import frc.robot.subsystems.flywheel.FlywheelIO;
 import frc.robot.util.feedforwards.TunableSimpleMotorFeedforward;
 
-public class FlywheelIOSimTalonFX implements FlywheelIO {
+public class FlywheelIOSimSparkMax implements FlywheelIO {
   private final String name;
   private final FlywheelHardwareConfig config;
   private final DCMotorSim sim;
@@ -25,7 +26,7 @@ public class FlywheelIOSimTalonFX implements FlywheelIO {
   private final double[] motorCurrents;
   private double velocitySetpoint = 0.0;
 
-  public FlywheelIOSimTalonFX(String name, FlywheelHardwareConfig config, DCMotor simMotorModel) {
+  public FlywheelIOSimSparkMax(String name, FlywheelHardwareConfig config, DCMotor simMotorModel) {
     this.name = name;
     this.config = config;
     motorsConnected = new boolean[config.canIds().length];
