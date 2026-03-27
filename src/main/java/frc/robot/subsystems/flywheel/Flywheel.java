@@ -104,6 +104,10 @@ public class Flywheel extends SubsystemBase {
     return inputs.velocity;
   }
 
+  public double getPosition() {
+    return inputs.position;
+  }
+
   public double getVelocitySetpoint() {
     return inputs.desiredVelocity;
   }
