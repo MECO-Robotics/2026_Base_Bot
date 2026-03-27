@@ -19,16 +19,18 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
-import frc.robot.commands.DriveCommands;
+import frc.robot.commands.drive.DriveCharacterization;
+import frc.robot.commands.drive.DriveCommands;
+import frc.robot.constants.Constants;
+import frc.robot.constants.drive.AzimuthMotorConstants;
+import frc.robot.constants.drive.DriveMotorConstants;
 import frc.robot.subsystems.drive.Drive;
 import frc.robot.subsystems.drive.Module;
-import frc.robot.subsystems.drive.azimuth_motor.AzimuthMotorConstants;
-import frc.robot.subsystems.drive.azimuth_motor.AzimuthMotorIOReplay;
-import frc.robot.subsystems.drive.azimuth_motor.AzimuthMotorIOSim;
+import frc.robot.sim.drive.azimuth_motor.AzimuthMotorIOSim;
+import frc.robot.sim.replay.drive.azimuth_motor.AzimuthMotorIOReplay;
 import frc.robot.subsystems.drive.azimuth_motor.AzimuthMotorIOTalonFX;
-import frc.robot.subsystems.drive.drive_motor.DriveMotorConstants;
-import frc.robot.subsystems.drive.drive_motor.DriveMotorIOReplay;
-import frc.robot.subsystems.drive.drive_motor.DriveMotorIOSim;
+import frc.robot.sim.drive.drive_motor.DriveMotorIOSim;
+import frc.robot.sim.replay.drive.drive_motor.DriveMotorIOReplay;
 import frc.robot.subsystems.drive.drive_motor.DriveMotorIOTalonFX;
 import frc.robot.subsystems.drive.gyro.GyroIO;
 import frc.robot.subsystems.drive.gyro.GyroIOPigeon2;
@@ -146,9 +148,11 @@ public class RobotContainer {
 
     // // Set up SysId routines
     autoChooser.addOption(
-        "Drive Wheel Radius Characterization", DriveCommands.wheelRadiusCharacterization(drive));
+        "Drive Wheel Radius Characterization",
+        DriveCharacterization.wheelRadiusCharacterization(drive));
     autoChooser.addOption(
-        "Drive Simple FF Characterization", DriveCommands.feedforwardCharacterization(drive));
+        "Drive Simple FF Characterization",
+        DriveCharacterization.feedforwardCharacterization(drive));
     autoChooser.addOption(
         "Drive SysId (Quasistatic Forward)",
         drive.sysIdQuasistatic(SysIdRoutine.Direction.kForward));

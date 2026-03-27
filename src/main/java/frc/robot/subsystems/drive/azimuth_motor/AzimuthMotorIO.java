@@ -1,7 +1,7 @@
 package frc.robot.subsystems.drive.azimuth_motor;
 
 import edu.wpi.first.math.geometry.Rotation2d;
-import frc.robot.subsystems.drive.azimuth_motor.AzimuthMotorConstants.AzimuthMotorGains;
+import frc.robot.constants.drive.AzimuthMotorConstants.AzimuthMotorGains;
 import org.littletonrobotics.junction.AutoLog;
 
 public interface AzimuthMotorIO {

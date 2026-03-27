@@ -4,7 +4,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.commands.flywheel.FlywheelVelocityCommand;
 import frc.robot.commands.flywheel.FlywheelVoltageCommand;
-import frc.robot.subsystems.flywheel.FlywheelConstants.FlywheelGains;
+import frc.robot.constants.types.FlywheelConstants.FlywheelGains;
 import frc.robot.util.mechanical_advantage.LinearProfile;
 import frc.robot.util.mechanical_advantage.LoggedTunableNumber;
 import java.util.function.DoubleSupplier;
@@ -102,6 +102,10 @@ public class Flywheel extends SubsystemBase {
 
   public double getVelocity() {
     return inputs.velocity;
+  }
+
+  public double getPosition() {
+    return inputs.position;
   }
 
   public double getVelocitySetpoint() {

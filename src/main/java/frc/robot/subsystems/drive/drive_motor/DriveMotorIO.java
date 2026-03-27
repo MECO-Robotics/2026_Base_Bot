@@ -1,6 +1,6 @@
 package frc.robot.subsystems.drive.drive_motor;
 
-import frc.robot.subsystems.drive.drive_motor.DriveMotorConstants.DriveMotorGains;
+import frc.robot.constants.drive.DriveMotorConstants.DriveMotorGains;
 import org.littletonrobotics.junction.AutoLog;
 
 public interface DriveMotorIO {

@@ -1,12 +1,12 @@
 package frc.robot.subsystems.position_joint;
 
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.commands.position_joint.PositionJointPositionCommand;
-import frc.robot.subsystems.position_joint.PositionJointConstants.PositionJointGains;
+import frc.robot.commands.position_joint.PositionJointVelocityCommand;
+import frc.robot.constants.types.PositionJointConstants.PositionJointGains;
 import frc.robot.util.mechanical_advantage.LoggedTunableNumber;
 import java.util.function.DoubleSupplier;
 import org.littletonrobotics.junction.Logger;
@@ -34,14 +34,8 @@ public class PositionJoint extends SubsystemBase {
   private final LoggedTunableNumber kTolerance;
 
   private final LoggedTunableNumber kSetpoint;
-
-  private TrapezoidProfile.Constraints constraints;
-
-  private TrapezoidProfile profile;
-
-  private TrapezoidProfile.State goal = new TrapezoidProfile.State();
-
-  private TrapezoidProfile.State setpoint = new TrapezoidProfile.State();
+  private Double profileMaxVelocityOverride = null;
+  private double goalPosition;
 
   public PositionJoint(PositionJointIO io, PositionJointGains gains) {
     super(io.getName());
@@ -66,12 +60,9 @@ public class PositionJoint extends SubsystemBase {
     kTolerance = new LoggedTunableNumber(name + "/Gains/kTolerance", gains.kTolerance());
 
     kSetpoint = new LoggedTunableNumber(name + "/Gains/kSetpoint", gains.kDefaultSetpoint());
+    goalPosition = gains.kDefaultSetpoint();
 
-    constraints = new TrapezoidProfile.Constraints(gains.kMaxVelo(), gains.kMaxAccel());
-    profile = new TrapezoidProfile(constraints);
-
-    goal = new TrapezoidProfile.State(gains.kDefaultSetpoint(), 0);
-    setpoint = goal;
+    positionJoint.setGains(gains);
 
     SmartDashboard.putData(name, this);
   }
@@ -81,9 +72,13 @@ public class PositionJoint extends SubsystemBase {
     positionJoint.updateInputs(inputs);
     Logger.processInputs(name, inputs);
 
-    setpoint = profile.calculate(0.02, setpoint, goal);
-
-    positionJoint.setPosition(setpoint.position, setpoint.velocity);
+    boolean usingDynamicOverride =
+        profileMaxVelocityOverride != null
+            && positionJoint.setPositionDynamic(
+                goalPosition, profileMaxVelocityOverride, kMaxAccel.get());
+    if (!usingDynamicOverride) {
+      positionJoint.setPosition(goalPosition, 0.0);
+    }
 
     LoggedTunableNumber.ifChanged(
         hashCode(),
@@ -104,12 +99,7 @@ public class PositionJoint extends SubsystemBase {
                   values[11],
                   values[12]));
 
-          goal =
-              new TrapezoidProfile.State(
-                  MathUtil.clamp(values[12], kMinPosition.get(), kMaxPosition.get()), 0);
-
-          constraints = new TrapezoidProfile.Constraints(values[7], values[8]);
-          profile = new TrapezoidProfile(constraints);
+          goalPosition = MathUtil.clamp(values[12], kMinPosition.get(), kMaxPosition.get());
         },
         kP,
         kI,
@@ -129,13 +119,24 @@ public class PositionJoint extends SubsystemBase {
   }
 
   public void setPosition(double position) {
-    goal =
-        new TrapezoidProfile.State(
-            MathUtil.clamp(position, kMinPosition.get(), kMaxPosition.get()), 0);
+    goalPosition = MathUtil.clamp(position, kMinPosition.get(), kMaxPosition.get());
+  }
+
+  public void setPosition(double position, double maxVelocity) {
+    profileMaxVelocityOverride = Math.max(0.0, maxVelocity);
+    setPosition(position);
+  }
+
+  public void clearProfileConstraintsOverride() {
+    if (profileMaxVelocityOverride == null) {
+      return;
+    }
+
+    profileMaxVelocityOverride = null;
   }
 
   public void incrementPosition(double deltaPosition) {
-    goal.position += deltaPosition;
+    setPosition(goalPosition + deltaPosition);
   }
 
   public void setVoltage(double voltage) {
@@ -146,24 +147,35 @@ public class PositionJoint extends SubsystemBase {
     return inputs.outputPosition;
   }
 
+  public double getVelocity() {
+    return inputs.velocity;
+  }
+
   public double getDesiredPosition() {
     return inputs.desiredPosition;
   }
 
   public boolean isFinished() {
-    return Math.abs(inputs.outputPosition - goal.position) < kTolerance.get();
+    return Math.abs(inputs.outputPosition - goalPosition) < kTolerance.get();
   }
 
   public void resetPosition() {
     positionJoint.resetPosition();
-    goal.position = 0;
+    goalPosition = 0;
   }
 
   public static Command setPosition(PositionJoint positionJoint, DoubleSupplier positionSupplier) {
     return new PositionJointPositionCommand(positionJoint, positionSupplier);
   }
 
+  public static Command setPosition(
+      PositionJoint positionJoint,
+      DoubleSupplier positionSupplier,
+      DoubleSupplier maxVelocitySupplier) {
+    return new PositionJointPositionCommand(positionJoint, positionSupplier, maxVelocitySupplier);
+  }
+
   public static Command setVelocity(PositionJoint positionJoint, DoubleSupplier velocitySupplier) {
-    return new PositionJointPositionCommand(positionJoint, velocitySupplier);
+    return new PositionJointVelocityCommand(positionJoint, velocitySupplier);
   }
 }
