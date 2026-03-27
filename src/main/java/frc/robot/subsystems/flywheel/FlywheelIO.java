@@ -1,9 +1,9 @@
 package frc.robot.subsystems.flywheel;
 
 import edu.wpi.first.math.system.plant.DCMotor;
-import frc.robot.Constants;
-import frc.robot.subsystems.flywheel.FlywheelConstants.FlywheelGains;
-import frc.robot.subsystems.flywheel.FlywheelConstants.FlywheelHardwareConfig;
+import frc.robot.constants.Constants;
+import frc.robot.constants.types.FlywheelConstants.FlywheelGains;
+import frc.robot.constants.types.FlywheelConstants.FlywheelHardwareConfig;
 import java.util.function.Supplier;
 import org.littletonrobotics.junction.AutoLog;
 

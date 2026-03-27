@@ -1,6 +1,6 @@
-package frc.robot.subsystems.drive.drive_motor;
+package frc.robot.constants.drive;
 
-import frc.robot.subsystems.drive.DriveConstants;
+import frc.robot.constants.drive.DriveConstants;
 
 public class DriveMotorConstants {
   // by default, the drive is set to the RoboRio's CANBus

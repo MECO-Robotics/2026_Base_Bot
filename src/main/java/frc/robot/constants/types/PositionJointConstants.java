@@ -1,4 +1,4 @@
-package frc.robot.subsystems.position_joint;
+package frc.robot.constants.types;
 
 import edu.wpi.first.math.geometry.Rotation2d;
 

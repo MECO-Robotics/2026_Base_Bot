@@ -1,4 +1,4 @@
-package frc.robot.subsystems.flywheel;
+package frc.robot.constants.types;
 
 public class FlywheelConstants {
   public record FlywheelGains(

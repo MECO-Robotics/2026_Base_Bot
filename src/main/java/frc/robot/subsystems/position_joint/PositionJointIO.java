@@ -1,9 +1,9 @@
 package frc.robot.subsystems.position_joint;
 
 import edu.wpi.first.math.system.plant.DCMotor;
-import frc.robot.Constants;
-import frc.robot.subsystems.position_joint.PositionJointConstants.PositionJointGains;
-import frc.robot.subsystems.position_joint.PositionJointConstants.PositionJointHardwareConfig;
+import frc.robot.constants.Constants;
+import frc.robot.constants.types.PositionJointConstants.PositionJointGains;
+import frc.robot.constants.types.PositionJointConstants.PositionJointHardwareConfig;
 import java.util.function.Supplier;
 import org.littletonrobotics.junction.AutoLog;
 
