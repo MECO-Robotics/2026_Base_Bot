@@ -3,6 +3,16 @@
 This page is for teams adopting the base bot for the first time. If you only
 read one page before editing code, read this one.
 
+## The short version
+
+Most students only need to do two kinds of work:
+
+1. Configure the robot in `frc.robot.constants`.
+2. Assemble commands, controller bindings, and autos in `RobotContainer`.
+
+That is the normal workflow. Do not start by rewriting subsystems, IO classes,
+or drive internals.
+
 ## First-week plan
 
 Use this sequence if you are new to the project:
@@ -22,12 +32,25 @@ For most team members, the project should feel like a configuration-and-composit
 codebase:
 
 1. Configure the robot in `frc.robot.constants`.
-2. Instantiate the subsystems you need.
+2. Instantiate or select the subsystems you need.
 3. Build commands and button bindings in `RobotContainer`.
 4. Tune values and iterate.
 
 That covers most day-to-day robot work. You should not need to edit low-level IO
 classes or rewrite reusable subsystem logic just to build a season robot.
+
+## Common first tasks
+
+If you are not sure what to do first, start here:
+
+1. Put in the correct CAN IDs and inversion values.
+2. Update gearing, offsets, limits, and presets.
+3. Remove bindings for mechanisms your robot does not have.
+4. Add a button that runs an intake, shooter, or scoring sequence.
+5. Add or select an autonomous routine.
+
+These are normal student tasks. They are much safer and more useful than
+starting in the low-level subsystem stack.
 
 ## What to understand first
 
@@ -55,6 +78,17 @@ Those are the main surfaces for:
 - controller bindings
 - autonomous chooser and named commands
 - PathPlanner assets
+
+## What not to touch early
+
+Avoid these until you have a concrete reason:
+
+- IO implementations for motor controllers and sensors
+- generic subsystem classes such as `Flywheel` and `PositionJoint`
+- drivetrain architecture
+- replay or sim plumbing
+
+Those layers are meant to stay reusable. Most student work should happen above them.
 
 ## Repository layout
 
@@ -126,6 +160,8 @@ The project switches behavior through `Constants.currentMode`:
 This split lets you write subsystem logic once and swap hardware access layers by mode.
 
 ## Where to go next
+
+The rest of the docs are intentionally more advanced:
 
 - Read {doc}`architecture` to understand the assembly flow.
 - Read {doc}`subsystems` before adding a new mechanism.
