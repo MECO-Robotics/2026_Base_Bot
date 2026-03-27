@@ -6,6 +6,7 @@ import frc.robot.constants.types.FlywheelConstants.FlywheelGains;
 import frc.robot.constants.types.FlywheelConstants.FlywheelHardwareConfig;
 import frc.robot.sim.flywheel.FlywheelIOSimSparkMax;
 import frc.robot.sim.flywheel.FlywheelIOSimTalonFX;
+import frc.robot.sim.replay.flywheel.FlywheelIOReplay;
 import java.util.function.Supplier;
 import org.littletonrobotics.junction.AutoLog;
 

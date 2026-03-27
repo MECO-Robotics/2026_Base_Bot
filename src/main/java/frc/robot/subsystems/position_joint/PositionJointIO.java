@@ -6,6 +6,7 @@ import frc.robot.constants.types.PositionJointConstants.PositionJointGains;
 import frc.robot.constants.types.PositionJointConstants.PositionJointHardwareConfig;
 import frc.robot.sim.position_joint.PositionJointIOSimSparkMax;
 import frc.robot.sim.position_joint.PositionJointIOSimTalonFX;
+import frc.robot.sim.replay.position_joint.PositionJointIOReplay;
 import java.util.function.Supplier;
 import org.littletonrobotics.junction.AutoLog;
 
