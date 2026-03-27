@@ -1,5 +1,95 @@
 # Getting Started
 
+This page is for teams adopting the base bot for the first time. If you only
+read one page before editing code, read this one.
+
+## The short version
+
+Most students only need to do two kinds of work:
+
+1. Configure the robot in `frc.robot.constants`.
+2. Assemble commands, controller bindings, and autos in `RobotContainer`.
+
+That is the normal workflow. Do not start by rewriting subsystems, IO classes,
+or drive internals.
+
+## First-week plan
+
+Use this sequence if you are new to the project:
+
+1. Build the code without changing anything.
+2. Read how `RobotContainer` assembles the robot.
+3. Replace placeholder constants and hardware IDs.
+4. Compose the robot behavior you want in `RobotContainer`.
+5. Keep the IO-backed structure intact until a real robot requirement forces a change.
+
+That order matters. Teams usually get into trouble by renaming packages and
+rewriting structure before they understand what is already reusable.
+
+## Default student workflow
+
+For most team members, the project should feel like a configuration-and-composition
+codebase:
+
+1. Configure the robot in `frc.robot.constants`.
+2. Instantiate or select the subsystems you need.
+3. Build commands and button bindings in `RobotContainer`.
+4. Tune values and iterate.
+
+That covers most day-to-day robot work. You should not need to edit low-level IO
+classes or rewrite reusable subsystem logic just to build a season robot.
+
+## Common first tasks
+
+If you are not sure what to do first, start here:
+
+1. Put in the correct CAN IDs and inversion values.
+2. Update gearing, offsets, limits, and presets.
+3. Remove bindings for mechanisms your robot does not have.
+4. Add a button that runs an intake, shooter, or scoring sequence.
+5. Add or select an autonomous routine.
+
+These are normal student tasks. They are much safer and more useful than
+starting in the low-level subsystem stack.
+
+## What to understand first
+
+Before editing subsystem code, make sure these ideas are clear:
+
+- Commands decide robot behavior.
+- Subsystems own mechanism logic.
+- IO classes isolate hardware-specific APIs.
+- Real, sim, and replay modes swap hardware access without rewriting subsystem behavior.
+
+If those boundaries make sense, the rest of the repository becomes much easier to extend.
+
+## Student-owned files
+
+The files most students should spend time in are:
+
+- `src/main/java/frc/robot/RobotContainer.java`
+- `src/main/java/frc/robot/constants`
+- `src/main/deploy`
+
+Those are the main surfaces for:
+
+- hardware IDs and mechanism constants
+- command compositions
+- controller bindings
+- autonomous chooser and named commands
+- PathPlanner assets
+
+## What not to touch early
+
+Avoid these until you have a concrete reason:
+
+- IO implementations for motor controllers and sensors
+- generic subsystem classes such as `Flywheel` and `PositionJoint`
+- drivetrain architecture
+- replay or sim plumbing
+
+Those layers are meant to stay reusable. Most student work should happen above them.
+
 ## Repository layout
 
 The codebase is structured as a normal WPILib Java project:
@@ -15,11 +105,37 @@ The codebase is structured as a normal WPILib Java project:
 1. Install the FRC 2026 WPILib toolchain and Java 17.
 2. Clone the repository.
 3. Open the project in VS Code or your preferred Java IDE.
-4. Build the robot code:
+4. Build the robot code before making changes:
 
 ```powershell
 ./gradlew build
 ```
+
+5. If the build fails, fix the environment first. Do not start changing robot code until the unmodified project builds on your machine.
+
+## Beginner customization checklist
+
+After the first successful build, the usual beginner changes are:
+
+1. Update hardware IDs and mechanism constants.
+2. Confirm which existing subsystems match your robot mechanisms.
+3. Remove or disable unused bindings and autos.
+4. Add your robot-specific command compositions in `RobotContainer`.
+5. Tune before deciding any subsystem rewrite is necessary.
+
+Safe early targets:
+
+- constants under `frc.robot.constants`
+- controller bindings in `RobotContainer`
+- command compositions in `RobotContainer`
+- PathPlanner autos and deploy assets
+
+Changes to postpone until later:
+
+- drive architecture rewrites
+- low-level motor-controller rewrites
+- collapsing multiple subsystems into one giant subsystem
+- removing sim or replay support because it "looks unnecessary"
 
 ## Build the documentation
 
@@ -42,3 +158,11 @@ The project switches behavior through `Constants.currentMode`:
 - `REPLAY`: IO is disabled and log replay implementations are used instead.
 
 This split lets you write subsystem logic once and swap hardware access layers by mode.
+
+## Where to go next
+
+The rest of the docs are intentionally more advanced:
+
+- Read {doc}`architecture` to understand the assembly flow.
+- Read {doc}`subsystems` before adding a new mechanism.
+- Read {doc}`customizing` when you are ready to make the project team-specific.
