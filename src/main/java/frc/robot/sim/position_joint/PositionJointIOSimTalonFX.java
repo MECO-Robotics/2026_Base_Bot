@@ -1,4 +1,4 @@
-package frc.robot.sim;
+package frc.robot.sim.position_joint;
 
 import static edu.wpi.first.units.Units.Rotations;
 import static edu.wpi.first.units.Units.RotationsPerSecond;

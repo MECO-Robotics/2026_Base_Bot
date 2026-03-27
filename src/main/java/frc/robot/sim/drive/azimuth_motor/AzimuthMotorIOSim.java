@@ -1,27 +1,27 @@
-package frc.robot.sim;
+package frc.robot.sim.drive.azimuth_motor;
 
 import static edu.wpi.first.units.Units.RotationsPerSecond;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.system.plant.LinearSystemId;
-import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
-import frc.robot.constants.drive.DriveMotorConstants.DriveMotorGains;
-import frc.robot.constants.drive.DriveMotorConstants.DriveMotorHardwareConfig;
-import frc.robot.subsystems.drive.drive_motor.DriveMotorIO;
+import frc.robot.constants.drive.AzimuthMotorConstants.AzimuthMotorGains;
+import frc.robot.constants.drive.AzimuthMotorConstants.AzimuthMotorHardwareConfig;
+import frc.robot.subsystems.drive.azimuth_motor.AzimuthMotorIO;
 import frc.robot.util.feedforwards.TunableSimpleMotorFeedforward;
 
 /**
  * Physics sim implementation of module IO. The sim models are configured using a set of module
  * constants from Phoenix. Simulation is always based on voltage control.
  */
-public class DriveMotorIOSim implements DriveMotorIO {
+public class AzimuthMotorIOSim implements AzimuthMotorIO {
   private final String name;
 
-  private final DriveMotorHardwareConfig config;
+  private final AzimuthMotorHardwareConfig config;
 
   private final DCMotor gearBox;
 
@@ -38,14 +38,15 @@ public class DriveMotorIOSim implements DriveMotorIO {
   private final double[] motorVoltages;
   private final double[] motorCurrents;
 
-  private double driveAppliedVolts = 0.0;
+  private double appliedVolts = 0.0;
   private double ffVolts = 0.0;
 
+  private double positionSetpoint = 0;
   private double velocitySetpoint = 0;
 
-  private boolean driveClosedLoop = false;
+  private boolean closedLoop = false;
 
-  public DriveMotorIOSim(String name, DriveMotorHardwareConfig config) {
+  public AzimuthMotorIOSim(String name, AzimuthMotorHardwareConfig config) {
     this.name = name;
 
     this.config = config;
@@ -66,34 +67,36 @@ public class DriveMotorIOSim implements DriveMotorIO {
 
     controller = new PIDController(0, 0, 0);
     feedforward = new TunableSimpleMotorFeedforward(0, 0, 0);
+
+    controller.enableContinuousInput(-Math.PI, Math.PI);
   }
 
   @Override
-  public void updateInputs(DriveMotorIOInputs inputs) {
+  public void updateInputs(AzimuthMotorIOInputs inputs) {
     // Run closed-loop control
-    if (driveClosedLoop) {
-      driveAppliedVolts =
-          controller.calculate(sim.getAngularVelocity().in(RotationsPerSecond), velocitySetpoint)
-              + ffVolts;
+    if (closedLoop) {
+      appliedVolts =
+          controller.calculate(sim.getAngularPositionRotations(), positionSetpoint) + ffVolts;
     } else {
       controller.reset();
     }
 
     // Update simulation state
-    sim.setInputVoltage(MathUtil.clamp(driveAppliedVolts, -12.0, 12.0));
+    sim.setInputVoltage(MathUtil.clamp(appliedVolts, -12.0, 12.0));
     sim.update(0.02);
 
     // Update drive inputs
     inputs.velocityRotationsPerSecond = sim.getAngularVelocity().in(RotationsPerSecond);
     inputs.desiredVelocityRotationsPerSecond = velocitySetpoint;
 
-    inputs.positionRotations = sim.getAngularPositionRotations();
+    inputs.outputPositionRotations = sim.getAngularPositionRotations();
+    inputs.desiredPositionRotations = positionSetpoint;
 
     for (int i = 0; i < config.canIds().length; i++) {
       motorsConnected[i] = true;
       motorPositions[i] = sim.getAngularPositionRotations();
       motorVelocities[i] = sim.getAngularVelocity().in(RotationsPerSecond);
-      motorVoltages[i] = driveAppliedVolts;
+      motorVoltages[i] = appliedVolts;
       motorCurrents[i] = sim.getCurrentDrawAmps();
     }
 
@@ -107,27 +110,30 @@ public class DriveMotorIOSim implements DriveMotorIO {
 
     // Update odometry inputs (50Hz because high-frequency odometry in sim doesn't matter)
     inputs.odometryTimestamps = new double[] {Timer.getFPGATimestamp()};
-    inputs.odometryDrivePositionsRad =
-        new double[] {Units.rotationsToRadians(inputs.positionRotations)};
+    inputs.odometryTurnPositions =
+        new Rotation2d[] {Rotation2d.fromRotations(inputs.outputPositionRotations)};
   }
 
   @Override
   public void setVoltage(double output) {
-    driveClosedLoop = false;
-    driveAppliedVolts = output;
+    closedLoop = false;
+    appliedVolts = output;
+
+    ffVolts = feedforward.calculateWithVelocities(velocitySetpoint, output);
   }
 
   @Override
-  public void setVelocity(double velocityRadPerSec) {
-    driveClosedLoop = true;
+  public void setPosition(double position, double velocity) {
+    closedLoop = true;
 
-    ffVolts = feedforward.calculateWithVelocities(velocitySetpoint, velocityRadPerSec);
+    ffVolts = feedforward.calculateWithVelocities(velocitySetpoint, velocity);
 
-    velocitySetpoint = velocityRadPerSec;
+    positionSetpoint = position;
+    velocitySetpoint = velocity;
   }
 
   @Override
-  public void setGains(DriveMotorGains gains) {
+  public void setGains(AzimuthMotorGains gains) {
     controller.setPID(gains.kP(), gains.kI(), gains.kD());
     feedforward.setGains(gains.kS(), gains.kV(), gains.kA());
   }
