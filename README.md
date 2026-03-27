@@ -13,6 +13,8 @@ FRC Robot Code has gotten significantly more advanced in recent years with brush
 This repository now includes a Sphinx documentation site under `docs/` using the
 [Furo theme](https://github.com/pradyunsg/furo).
 
+Hosted docs: https://meco-robotics.github.io/2026_Base_Bot/
+
 Build it locally with:
 
 ```powershell
