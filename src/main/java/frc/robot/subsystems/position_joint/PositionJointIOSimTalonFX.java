@@ -12,63 +12,45 @@ import frc.robot.subsystems.position_joint.PositionJointConstants.PositionJointH
 import frc.robot.util.feedforwards.PositionJointFeedforward;
 import frc.robot.util.feedforwards.TunableElevatorFeedforward;
 
-public class PositionJointIOSim implements PositionJointIO {
+public class PositionJointIOSimTalonFX implements PositionJointIO {
   private final String name;
-
   private final PositionJointHardwareConfig config;
-
-  private final DCMotor gearBox;
-
   private final DCMotorSim sim;
-
   private final PIDController controller;
   private final PositionJointFeedforward feedforward;
-
   private final boolean[] motorsConnected;
-
   private final double[] motorPositions;
   private final double[] motorVelocities;
-
   private final double[] motorVoltages;
   private final double[] motorCurrents;
-
   private double positionSetpoint = 0.0;
   private double velocitySetpoint = 0.0;
-  private double inputVoltage = 0.0;
 
-  public PositionJointIOSim(String name, PositionJointHardwareConfig config) {
+  public PositionJointIOSimTalonFX(
+      String name, PositionJointHardwareConfig config, DCMotor simMotorModel) {
     this.name = name;
-
     this.config = config;
-
-    assert config.canIds().length > 0 && (config.canIds().length == config.reversed().length);
-
     motorsConnected = new boolean[config.canIds().length];
     motorPositions = new double[config.canIds().length];
     motorVelocities = new double[config.canIds().length];
     motorVoltages = new double[config.canIds().length];
     motorCurrents = new double[config.canIds().length];
-
-    gearBox = DCMotor.getKrakenX60Foc(config.canIds().length);
-
     sim =
         new DCMotorSim(
-            LinearSystemId.createDCMotorSystem(gearBox, 0.01, config.gearRatio()), gearBox);
-
+            LinearSystemId.createDCMotorSystem(simMotorModel, 0.01, config.gearRatio()), simMotorModel);
     controller = new PIDController(0, 0, 0);
     feedforward = new TunableElevatorFeedforward(0.0, 0.0, 0.0, 0.0);
   }
 
   @Override
   public void updateInputs(PositionJointIOInputs inputs) {
-    inputVoltage =
+    double inputVoltage =
         controller.calculate(sim.getAngularPosition().in(Rotations), positionSetpoint)
             + feedforward.calculate(
                 sim.getAngularPositionRotations(),
                 sim.getAngularVelocity().in(RotationsPerSecond),
                 velocitySetpoint,
                 0.02);
-    ;
     sim.setInputVoltage(inputVoltage);
     sim.update(0.02);
 
@@ -79,19 +61,15 @@ public class PositionJointIOSim implements PositionJointIO {
 
     for (int i = 0; i < config.canIds().length; i++) {
       motorsConnected[i] = true;
-
       motorPositions[i] = sim.getAngularPosition().in(Rotations);
       motorVelocities[i] = sim.getAngularVelocity().in(RotationsPerSecond);
-
       motorVoltages[i] = sim.getInputVoltage();
       motorCurrents[i] = sim.getCurrentDrawAmps();
     }
 
     inputs.motorsConnected = motorsConnected;
-
     inputs.motorPositions = motorPositions;
     inputs.motorVelocities = motorVelocities;
-
     inputs.motorVoltages = motorVoltages;
     inputs.motorCurrents = motorCurrents;
   }
@@ -106,8 +84,6 @@ public class PositionJointIOSim implements PositionJointIO {
   public void setGains(PositionJointGains gains) {
     controller.setPID(gains.kP(), gains.kI(), gains.kD());
     feedforward.setGains(gains.kS(), gains.kG(), gains.kV(), gains.kA());
-
-    System.out.println(name + " gains set to " + gains);
   }
 
   @Override
