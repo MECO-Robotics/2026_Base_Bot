@@ -1,6 +1,10 @@
 package frc.robot.subsystems.flywheel;
 
+import edu.wpi.first.math.system.plant.DCMotor;
+import frc.robot.Constants;
 import frc.robot.subsystems.flywheel.FlywheelConstants.FlywheelGains;
+import frc.robot.subsystems.flywheel.FlywheelConstants.FlywheelHardwareConfig;
+import java.util.function.Supplier;
 import org.littletonrobotics.junction.AutoLog;
 
 public interface FlywheelIO {
@@ -28,6 +32,38 @@ public interface FlywheelIO {
   public default void setVoltage(double voltage) {}
 
   public default void setGains(FlywheelGains gains) {}
+
+  public static Supplier<FlywheelIO> replayFactory(String name) {
+    return () -> new FlywheelIOReplay(name);
+  }
+
+  public static FlywheelIO fromMode(
+      String name,
+      FlywheelHardwareConfig config,
+      Supplier<FlywheelIO> subsystemSupplier,
+      DCMotor simMotorModel) {
+    return switch (Constants.currentMode) {
+      case REAL -> subsystemSupplier.get();
+      case SIM -> replayFactory(name).get();
+      default -> replayFactory(name).get();
+    };
+  }
+
+  public static FlywheelIO fromSparkMax(String name, FlywheelHardwareConfig config) {
+    return switch (Constants.currentMode) {
+      case REAL -> new FlywheelIOSparkMax(name, config);
+      case SIM -> new FlywheelIOSimSparkMax(name, config, DCMotor.getNEO(config.canIds().length));
+      default -> replayFactory(name).get();
+    };
+  }
+
+  public static FlywheelIO fromTalonFX(String name, FlywheelHardwareConfig config) {
+    return switch (Constants.currentMode) {
+      case REAL -> new FlywheelIOTalonFX(name, config);
+      case SIM -> new FlywheelIOSimTalonFX(name, config, DCMotor.getKrakenX60Foc(config.canIds().length));
+      default -> replayFactory(name).get();
+    };
+  }
 
   public String getName();
 }

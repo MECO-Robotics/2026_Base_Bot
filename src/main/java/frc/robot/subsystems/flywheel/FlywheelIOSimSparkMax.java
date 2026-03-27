@@ -11,47 +11,32 @@ import frc.robot.subsystems.flywheel.FlywheelConstants.FlywheelGains;
 import frc.robot.subsystems.flywheel.FlywheelConstants.FlywheelHardwareConfig;
 import frc.robot.util.feedforwards.TunableSimpleMotorFeedforward;
 
-public class FlywheelIOSim implements FlywheelIO {
+public class FlywheelIOSimSparkMax implements FlywheelIO {
   private final String name;
-
   private final FlywheelHardwareConfig config;
-
-  private final DCMotor gearBox;
-
   private final DCMotorSim sim;
-
   private final PIDController controller;
   private final TunableSimpleMotorFeedforward feedforward;
-
+  private final boolean[] motorsConnected;
   private final double[] motorPositions;
   private final double[] motorVelocities;
   private final double[] motorAccelerations;
-
   private final double[] motorVoltages;
   private final double[] motorCurrents;
+  private double velocitySetpoint = 0.0;
 
-  private double velocitySetpoint = 0;
-
-  public FlywheelIOSim(String name, FlywheelHardwareConfig config) {
+  public FlywheelIOSimSparkMax(String name, FlywheelHardwareConfig config, DCMotor simMotorModel) {
     this.name = name;
-
     this.config = config;
-
-    assert config.canIds().length > 0 && (config.canIds().length == config.reversed().length);
-
+    motorsConnected = new boolean[config.canIds().length];
     motorPositions = new double[config.canIds().length];
     motorVelocities = new double[config.canIds().length];
     motorAccelerations = new double[config.canIds().length];
-
     motorVoltages = new double[config.canIds().length];
     motorCurrents = new double[config.canIds().length];
-
-    gearBox = DCMotor.getKrakenX60Foc(config.canIds().length);
-
     sim =
         new DCMotorSim(
-            LinearSystemId.createDCMotorSystem(gearBox, 0.025, config.gearRatio()), gearBox);
-
+            LinearSystemId.createDCMotorSystem(simMotorModel, 0.025, config.gearRatio()), simMotorModel);
     controller = new PIDController(0, 0, 0);
     feedforward = new TunableSimpleMotorFeedforward(0, 0, 0);
   }
@@ -65,13 +50,15 @@ public class FlywheelIOSim implements FlywheelIO {
     sim.update(0.02);
 
     inputs.velocity = sim.getAngularVelocityRPM();
+    inputs.position = sim.getAngularPositionRotations();
     inputs.desiredVelocity = velocitySetpoint;
+    inputs.motorsConnected = motorsConnected;
 
     for (int i = 0; i < config.canIds().length; i++) {
+      motorsConnected[i] = true;
       motorPositions[i] = sim.getAngularPositionRotations();
       motorVelocities[i] = sim.getAngularVelocity().in(RotationsPerSecond);
       motorAccelerations[i] = sim.getAngularAcceleration().in(RotationsPerSecondPerSecond);
-
       motorVoltages[i] = inputVoltage;
       motorCurrents[i] = sim.getCurrentDrawAmps();
     }
@@ -79,7 +66,6 @@ public class FlywheelIOSim implements FlywheelIO {
     inputs.motorPositions = motorPositions;
     inputs.motorVelocities = motorVelocities;
     inputs.motorAccelerations = motorAccelerations;
-
     inputs.motorVoltages = motorVoltages;
     inputs.motorCurrents = motorCurrents;
   }
@@ -93,8 +79,6 @@ public class FlywheelIOSim implements FlywheelIO {
   public void setGains(FlywheelGains gains) {
     controller.setPID(gains.kP(), gains.kI(), gains.kD());
     feedforward.setGains(gains.kS(), gains.kV(), gains.kA());
-
-    System.out.println(name + " gains set to " + gains);
   }
 
   @Override
