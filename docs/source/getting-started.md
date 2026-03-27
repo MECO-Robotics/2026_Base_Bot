@@ -9,12 +9,25 @@ Use this sequence if you are new to the project:
 
 1. Build the code without changing anything.
 2. Read how `RobotContainer` assembles the robot.
-3. Identify which existing subsystems map to your real mechanisms.
-4. Replace placeholder constants and hardware IDs.
+3. Replace placeholder constants and hardware IDs.
+4. Compose the robot behavior you want in `RobotContainer`.
 5. Keep the IO-backed structure intact until a real robot requirement forces a change.
 
 That order matters. Teams usually get into trouble by renaming packages and
 rewriting structure before they understand what is already reusable.
+
+## Default student workflow
+
+For most team members, the project should feel like a configuration-and-composition
+codebase:
+
+1. Configure the robot in `frc.robot.constants`.
+2. Instantiate the subsystems you need.
+3. Build commands and button bindings in `RobotContainer`.
+4. Tune values and iterate.
+
+That covers most day-to-day robot work. You should not need to edit low-level IO
+classes or rewrite reusable subsystem logic just to build a season robot.
 
 ## What to understand first
 
@@ -26,6 +39,22 @@ Before editing subsystem code, make sure these ideas are clear:
 - Real, sim, and replay modes swap hardware access without rewriting subsystem behavior.
 
 If those boundaries make sense, the rest of the repository becomes much easier to extend.
+
+## Student-owned files
+
+The files most students should spend time in are:
+
+- `src/main/java/frc/robot/RobotContainer.java`
+- `src/main/java/frc/robot/constants`
+- `src/main/deploy`
+
+Those are the main surfaces for:
+
+- hardware IDs and mechanism constants
+- command compositions
+- controller bindings
+- autonomous chooser and named commands
+- PathPlanner assets
 
 ## Repository layout
 
@@ -55,19 +84,22 @@ The codebase is structured as a normal WPILib Java project:
 After the first successful build, the usual beginner changes are:
 
 1. Update hardware IDs and mechanism constants.
-2. Confirm which subsystems you actually need for your robot.
+2. Confirm which existing subsystems match your robot mechanisms.
 3. Remove or disable unused bindings and autos.
-4. Add your robot-specific commands before rewriting shared subsystem internals.
+4. Add your robot-specific command compositions in `RobotContainer`.
+5. Tune before deciding any subsystem rewrite is necessary.
 
 Safe early targets:
 
 - constants under `frc.robot.constants`
 - controller bindings in `RobotContainer`
+- command compositions in `RobotContainer`
 - PathPlanner autos and deploy assets
 
 Changes to postpone until later:
 
 - drive architecture rewrites
+- low-level motor-controller rewrites
 - collapsing multiple subsystems into one giant subsystem
 - removing sim or replay support because it "looks unnecessary"
 

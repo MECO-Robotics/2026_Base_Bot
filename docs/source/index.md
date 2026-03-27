@@ -23,6 +23,17 @@ customizing
 - Reusable IO-backed subsystem patterns for flywheels, joints, sensors, piece detection, and vision.
 - Real, sim, and replay execution modes so development is not blocked on hardware.
 
+## Student workflow
+
+For most students, the normal job is:
+
+1. Configure constants for the real robot.
+2. Assemble command compositions and controller bindings in `RobotContainer`.
+3. Tune and test.
+
+You usually do not need to rewrite subsystem internals or IO layers unless the
+robot has a genuinely new hardware requirement that the base patterns do not cover.
+
 ## Recommended reading order
 
 1. {doc}`getting-started`
