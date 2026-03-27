@@ -27,11 +27,16 @@ body[data-theme="light"] {
     rgba(var(--meco-blue-rgb), 0.98) 0%,
     #0f3264 100%
   );
-  --color-sidebar-link-text: rgba(255, 255, 255, 0.88);
+  --color-sidebar-link-text: rgba(255, 255, 255, 0.96);
   --color-sidebar-link-text--top-level: var(--meco-white);
-  --color-sidebar-link-text--top-level-current: var(--meco-tan);
-  --color-sidebar-item-background--hover: rgba(255, 255, 255, 0.1);
-  --color-sidebar-item-expander-background--hover: rgba(255, 255, 255, 0.1);
+  --color-sidebar-link-text--top-level-current: var(--meco-white);
+  --color-sidebar-caption-text: rgba(255, 255, 255, 0.72);
+  --color-sidebar-search-text: var(--meco-white);
+  --color-sidebar-search-background: rgba(255, 255, 255, 0.14);
+  --color-sidebar-search-background--focus: rgba(255, 255, 255, 0.22);
+  --color-sidebar-search-border: rgba(255, 255, 255, 0.18);
+  --color-sidebar-item-background--hover: rgba(255, 255, 255, 0.14);
+  --color-sidebar-item-expander-background--hover: rgba(255, 255, 255, 0.14);
   --inline-code-background: rgba(var(--meco-tan-rgb), 0.28);
   --color-admonition-background: rgba(var(--meco-blue-rgb), 0.06);
   --bot-accent-soft: rgba(var(--meco-blue-rgb), 0.16);
@@ -85,6 +90,41 @@ body[data-theme="dark"] {
   margin-top: 0.8rem;
   border-radius: 999px;
   background: linear-gradient(90deg, var(--meco-red), var(--meco-tan));
+}
+
+.sidebar-tree .caption {
+  color: var(--color-sidebar-caption-text);
+  font-weight: 700;
+}
+
+.sidebar-tree a {
+  font-weight: 500;
+}
+
+.sidebar-tree .reference {
+  border-radius: 0.55rem;
+}
+
+.sidebar-tree .reference:hover {
+  text-decoration: none;
+}
+
+.sidebar-tree .current > .reference,
+.sidebar-tree .current-page > .reference,
+.sidebar-tree label.current > .reference {
+  background: linear-gradient(
+    90deg,
+    rgba(var(--meco-red-rgb), 0.9) 0%,
+    rgba(var(--meco-red-rgb), 0.72) 100%
+  );
+  box-shadow: 0 0.5rem 1.5rem -1rem rgba(var(--meco-red-rgb), 0.8);
+  color: var(--meco-white) !important;
+  font-weight: 700;
+}
+
+.sidebar-search-container input {
+  border-radius: 999px;
+  border: 1px solid var(--color-sidebar-search-border);
 }
 
 .content h1,
