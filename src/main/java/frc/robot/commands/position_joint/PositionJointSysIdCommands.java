@@ -60,6 +60,7 @@ public class PositionJointSysIdCommands {
         .beforeStarting(stats::start)
         .finallyDo(
             (interrupted) -> {
+              positionJoint.setVoltage(0);
               stats.finish();
               SysIdResultsPublisher.publish(testName, interrupted, stats);
             });

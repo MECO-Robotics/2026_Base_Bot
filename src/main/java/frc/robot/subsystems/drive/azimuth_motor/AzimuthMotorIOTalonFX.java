@@ -207,7 +207,7 @@ public class AzimuthMotorIOTalonFX implements AzimuthMotorIO {
     positions.add(motors[0].getPosition());
     velocities.add(motors[0].getVelocity());
 
-    voltages.add(motors[0].getSupplyVoltage());
+    voltages.add(motors[0].getMotorVoltage());
     currents.add(motors[0].getStatorCurrent());
 
     motorAlerts[0] =
@@ -219,7 +219,17 @@ public class AzimuthMotorIOTalonFX implements AzimuthMotorIO {
     for (int i = 1; i < config.canIds().length; i++) {
       motorval = config.reversed()[i] ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned;
       motors[i] = new TalonFX(config.canIds()[i], config.canBus());
-      motors[i].setControl(new Follower(i, motorval));
+      final int followerIndex = i;
+      tryUntilOk(
+          5,
+          () ->
+              motors[followerIndex]
+                  .getConfigurator()
+                  .apply(
+                      new CurrentLimitsConfigs()
+                          .withSupplyCurrentLimit(config.currentLimit())
+                          .withSupplyCurrentLimitEnable(true)));
+      motors[i].setControl(new Follower(motors[0].getDeviceID(), motorval));
 
       motorAlerts[i] =
           new Alert(
@@ -230,7 +240,7 @@ public class AzimuthMotorIOTalonFX implements AzimuthMotorIO {
       positions.add(motors[i].getPosition());
       velocities.add(motors[i].getVelocity());
 
-      voltages.add(motors[i].getSupplyVoltage());
+      voltages.add(motors[i].getMotorVoltage());
       currents.add(motors[i].getStatorCurrent());
     }
 
@@ -275,6 +285,10 @@ public class AzimuthMotorIOTalonFX implements AzimuthMotorIO {
     inputs.motorVelocities = motorVelocities;
 
     inputs.motorVoltages = motorVoltages;
+    inputs.motorSupplyVoltages =
+        java.util.Arrays.stream(motors)
+            .mapToDouble(m -> m.getSupplyVoltage().refresh().getValueAsDouble())
+            .toArray();
     inputs.motorCurrents = motorCurrents;
 
     switch (hardwareConfig.encoderType()) {

@@ -111,7 +111,7 @@ public class DriveMotorIOSparkMax implements DriveMotorIO {
       motorPositions[i] = motors[i].getEncoder().getPosition();
       motorVelocities[i] = motors[i].getEncoder().getVelocity();
 
-      motorVoltages[i] = motors[i].getAppliedOutput() * 12;
+      motorVoltages[i] = motors[i].getAppliedOutput() * motors[i].getBusVoltage();
       motorCurrents[i] = motors[i].getOutputCurrent();
 
       motorAlerts[i].set(!motorsConnected[i]);
@@ -123,6 +123,8 @@ public class DriveMotorIOSparkMax implements DriveMotorIO {
     inputs.motorVelocities = motorVelocities;
 
     inputs.motorVoltages = motorVoltages;
+    inputs.motorSupplyVoltages =
+        java.util.Arrays.stream(motors).mapToDouble(m -> m.getBusVoltage()).toArray();
     inputs.motorCurrents = motorCurrents;
 
     inputs.odometryTimestamps =
