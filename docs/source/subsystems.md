@@ -44,7 +44,7 @@ This is the subsystem you should reach for when the mechanism is fundamentally d
 
 Joint position commands finish at tolerance and retain their goal afterward. An optional `complianceAfterTarget` argument releases the motor into coast at the target until a new goal is requested. Compliance is disabled by default. Direct voltage commands retain output ownership until the next position request.
 
-Flywheel and joint simulation implementations now live beside their hardware IO in `subsystems/flywheel` and `subsystems/position_joint`. Their `fromSparkMax` and `fromTalonFX` factories select real, simulated, or replay IO. Hardware configurations include simulation inertia; joints also specify `MechanismType` and an output radius for linear mechanisms.
+Flywheel and joint simulation implementations now live beside their hardware IO in `subsystems/flywheel` and `subsystems/position_joint`. Their `fromSparkMax` and `fromTalonFX` factories select real, simulated, or replay IO. Hardware configuration, encoder calibration, and physical simulation parameters are separate. See {doc}`mechanism-contracts` for the required factory arguments, units, gravity, and reset semantics.
 
 ## Vision
 

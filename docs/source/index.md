@@ -19,6 +19,7 @@ getting-started
 
 architecture
 subsystems
+mechanism-contracts
 customizing
 ```
 
