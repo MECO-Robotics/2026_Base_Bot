@@ -35,6 +35,7 @@ public class Flywheel extends SubsystemBase {
   private final LoggedTunableNumber kSetpoint;
 
   private double velocitySetpoint;
+  private double lastDashboardSetpoint;
 
   private boolean voltageMode = false;
 
@@ -64,6 +65,7 @@ public class Flywheel extends SubsystemBase {
 
     kSetpoint = new LoggedTunableNumber(name + "/Gains/kSetpoint", 0.0);
 
+    lastDashboardSetpoint = kSetpoint.get();
     // Load the configured gains immediately so sim IO PID/FF are initialized at
     // startup.
     flywheel.setGains(gains);
@@ -74,9 +76,10 @@ public class Flywheel extends SubsystemBase {
     flywheel.updateInputs(inputs);
     Logger.processInputs(name, inputs);
 
-    Command currentCommand = getCurrentCommand();
-    if (currentCommand == null || currentCommand == getDefaultCommand()) {
-      velocitySetpoint = kSetpoint.get();
+    double dashboard = kSetpoint.get();
+    if (Double.compare(dashboard, lastDashboardSetpoint) != 0) {
+      lastDashboardSetpoint = dashboard;
+      if (getCurrentCommand() == null && Double.isFinite(dashboard)) setVelocity(dashboard);
     }
 
     if (!voltageMode) {
@@ -90,10 +93,6 @@ public class Flywheel extends SubsystemBase {
               new FlywheelGains(
                   values[0], values[1], values[2], values[3], values[4], values[5], values[6],
                   values[7]));
-
-          if (currentCommand == null || currentCommand == getDefaultCommand()) {
-            velocitySetpoint = values[8];
-          }
         },
         kP,
         kI,
@@ -102,18 +101,19 @@ public class Flywheel extends SubsystemBase {
         kV,
         kA,
         kMaxAccel,
-        kTolerance,
-        kSetpoint);
+        kTolerance);
   }
 
   /** Sets a new velocity goal for closed-loop control. */
   public void setVelocity(double velocity) {
+    if (!Double.isFinite(velocity)) throw new IllegalArgumentException("Velocity must be finite");
     voltageMode = false;
     velocitySetpoint = velocity;
   }
 
   /** Enables open-loop control and applies a direct voltage command. */
   public void setVoltage(double voltage) {
+    if (!Double.isFinite(voltage)) throw new IllegalArgumentException("Voltage must be finite");
     voltageMode = true;
     flywheel.setVoltage(voltage);
   }
@@ -128,14 +128,14 @@ public class Flywheel extends SubsystemBase {
     return inputs.position;
   }
 
-  /** Returns the last requested velocity setpoint from the IO layer. */
+  /** Returns the requested target independently of IO telemetry. */
   public double getVelocitySetpoint() {
-    return inputs.desiredVelocity;
+    return velocitySetpoint;
   }
 
   /** Returns true when measured velocity is within configured tolerance of setpoint. */
   public boolean isFinished() {
-    return Math.abs(inputs.velocity - inputs.desiredVelocity) < kTolerance.get();
+    return Math.abs(inputs.velocity - velocitySetpoint) < kTolerance.get();
   }
 
   /** Builds a command that continuously sets flywheel velocity from a supplier. */

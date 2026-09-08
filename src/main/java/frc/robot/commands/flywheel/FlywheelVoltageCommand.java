@@ -22,6 +22,16 @@ public class FlywheelVoltageCommand extends Command {
   }
 
   @Override
+  public void initialize() {
+    flywheel.setVoltage(voltage.getAsDouble());
+  }
+
+  @Override
+  public void end(boolean interrupted) {
+    flywheel.setVoltage(0);
+  }
+
+  @Override
   public void execute() {
     flywheel.setVoltage(voltage.getAsDouble());
   }

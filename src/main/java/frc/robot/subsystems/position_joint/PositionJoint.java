@@ -42,6 +42,8 @@ public class PositionJoint extends SubsystemBase {
   private final LoggedTunableNumber kSetpoint;
   private Double profileMaxVelocityOverride = null;
   private double goalPosition;
+  private double lastDashboardSetpoint;
+  private final double configuredDefaultSetpoint;
   private boolean complianceAfterTarget = false;
   private boolean complianceActive = false;
   private boolean voltageMode = false;
@@ -76,6 +78,8 @@ public class PositionJoint extends SubsystemBase {
 
     kSetpoint = new LoggedTunableNumber(name + "/Gains/kSetpoint", gains.kDefaultSetpoint());
     goalPosition = gains.kDefaultSetpoint();
+    configuredDefaultSetpoint = gains.kDefaultSetpoint();
+    lastDashboardSetpoint = kSetpoint.get();
 
     // Load the configured gains immediately so sim IO PID/FF are initialized at
     // startup.
@@ -104,7 +108,7 @@ public class PositionJoint extends SubsystemBase {
               && positionJoint.setPositionDynamic(
                   goalPosition, profileMaxVelocityOverride, kMaxAccel.get());
       if (!usingDynamicOverride) {
-        positionJoint.setPosition(goalPosition, 0.0);
+        positionJoint.setPosition(goalPosition);
       }
     }
 
@@ -125,7 +129,7 @@ public class PositionJoint extends SubsystemBase {
                   values[9],
                   values[10],
                   values[11],
-                  values[12]));
+                  configuredDefaultSetpoint));
         },
         kP,
         kI,
@@ -138,19 +142,12 @@ public class PositionJoint extends SubsystemBase {
         kMaxAccel,
         kMinPosition,
         kMaxPosition,
-        kTolerance,
-        kSetpoint);
-    LoggedTunableNumber.ifChanged(
-        hashCode() + 1,
-        (values) -> {
-          Command currentCommand = getCurrentCommand();
-          if (currentCommand == null || currentCommand == getDefaultCommand()) {
-            goalPosition = MathUtil.clamp(values[0], values[1], values[2]);
-          }
-        },
-        kSetpoint,
-        kMinPosition,
-        kMaxPosition);
+        kTolerance);
+    double dashboard = kSetpoint.get();
+    if (Double.compare(dashboard, lastDashboardSetpoint) != 0) {
+      lastDashboardSetpoint = dashboard;
+      if (getCurrentCommand() == null && Double.isFinite(dashboard)) setPosition(dashboard);
+    }
 
     Logger.recordOutput(name + "/GoalPosition", goalPosition);
     Logger.recordOutput(name + "/isFinished", atTarget);
@@ -160,14 +157,21 @@ public class PositionJoint extends SubsystemBase {
 
   /** Sets a new goal position, clamped to configured mechanism limits. */
   public void setPosition(double position) {
+    if (!Double.isFinite(position)) throw new IllegalArgumentException("Position must be finite");
     voltageMode = false;
     disableComplianceHold();
-    goalPosition = MathUtil.clamp(position, kMinPosition.get(), kMaxPosition.get());
+    goalPosition =
+        MathUtil.clamp(
+            position,
+            kMinPosition.get() - positionJoint.getPositionOffset(),
+            kMaxPosition.get() - positionJoint.getPositionOffset());
   }
 
   /** Sets a new goal position with a temporary max-velocity override. */
   public void setPosition(double position, double maxVelocity) {
-    profileMaxVelocityOverride = Math.max(0.0, maxVelocity);
+    if (!Double.isFinite(maxVelocity) || maxVelocity <= 0)
+      throw new IllegalArgumentException("Velocity constraint must be positive");
+    profileMaxVelocityOverride = maxVelocity;
     setPosition(position);
   }
 
@@ -229,6 +233,10 @@ public class PositionJoint extends SubsystemBase {
   public void resetPosition() {
     positionJoint.resetPosition();
     goalPosition = 0;
+    inputs.outputPosition = 0;
+    voltageMode = false;
+    profileMaxVelocityOverride = null;
+    complianceAfterTarget = false;
     disableComplianceHold();
   }
 

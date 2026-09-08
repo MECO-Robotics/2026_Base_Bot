@@ -3,7 +3,6 @@ package frc.robot.subsystems.flywheel;
 import com.revrobotics.PersistMode;
 import com.revrobotics.REVLibError;
 import com.revrobotics.ResetMode;
-import com.revrobotics.spark.ClosedLoopSlot;
 import com.revrobotics.spark.SparkBase.ControlType;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
 import com.revrobotics.spark.SparkMax;
@@ -16,7 +15,6 @@ import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import frc.robot.constants.types.FlywheelConstants.FlywheelGains;
 import frc.robot.constants.types.FlywheelConstants.FlywheelHardwareConfig;
-import frc.robot.util.feedforwards.TunableSimpleMotorFeedforward;
 
 /** SparkMax-backed implementation of {@link FlywheelIO}. */
 public class FlywheelIOSparkMax implements FlywheelIO {
@@ -34,8 +32,6 @@ public class FlywheelIOSparkMax implements FlywheelIO {
   private final double[] motorCurrents;
 
   private final Alert[] motorAlerts;
-
-  private TunableSimpleMotorFeedforward feedforward;
 
   private double velocitySetpoint = 0.0;
 
@@ -119,8 +115,6 @@ public class FlywheelIOSparkMax implements FlywheelIO {
               name + " Follower Motor " + i + " Disconnected! CAN ID: " + config.canIds()[i],
               AlertType.kError);
     }
-
-    feedforward = new TunableSimpleMotorFeedforward(0, 0, 0);
   }
 
   @Override
@@ -136,7 +130,7 @@ public class FlywheelIOSparkMax implements FlywheelIO {
       motorPositions[i] = motors[i].getEncoder().getPosition();
       motorVelocities[i] = motors[i].getEncoder().getVelocity();
 
-      motorVoltages[i] = motors[i].getAppliedOutput() * 12;
+      motorVoltages[i] = motors[i].getAppliedOutput() * motors[i].getBusVoltage();
       motorCurrents[i] = motors[i].getOutputCurrent();
 
       motorAlerts[i].set(!motorsConnected[i]);
@@ -148,6 +142,8 @@ public class FlywheelIOSparkMax implements FlywheelIO {
     inputs.motorVelocities = motorVelocities;
 
     inputs.motorVoltages = motorVoltages;
+    inputs.motorSupplyVoltages =
+        java.util.Arrays.stream(motors).mapToDouble(m -> m.getBusVoltage()).toArray();
     inputs.motorCurrents = motorCurrents;
   }
 
@@ -157,11 +153,7 @@ public class FlywheelIOSparkMax implements FlywheelIO {
 
     motors[0]
         .getClosedLoopController()
-        .setSetpoint(
-            velocitySetpoint,
-            ControlType.kMAXMotionVelocityControl,
-            ClosedLoopSlot.kSlot0,
-            feedforward.calculateWithVelocities(motors[0].getEncoder().getVelocity(), velocity));
+        .setSetpoint(velocitySetpoint, ControlType.kMAXMotionVelocityControl);
   }
 
   @Override
@@ -172,14 +164,19 @@ public class FlywheelIOSparkMax implements FlywheelIO {
   @Override
   public void setGains(FlywheelGains gains) {
     motors[0].configure(
-        leaderConfig.apply(
-            new ClosedLoopConfig()
-                .pid(gains.kP(), gains.kI(), gains.kD())
-                .apply(new MAXMotionConfig().maxAcceleration(gains.kMaxAccel()))),
+        leaderConfig
+            .voltageCompensation(12)
+            .apply(
+                new ClosedLoopConfig()
+                    .pid(gains.kP() / 12, gains.kI() / 12000, gains.kD() * 1000 / 12)
+                    .apply(
+                        new com.revrobotics.spark.config.FeedForwardConfig()
+                            .kS(gains.kS())
+                            .kV(gains.kV())
+                            .kA(gains.kA()))
+                    .apply(new MAXMotionConfig().maxAcceleration(gains.kMaxAccel()))),
         ResetMode.kNoResetSafeParameters,
         PersistMode.kNoPersistParameters);
-
-    feedforward.setGains(gains.kS(), gains.kV(), gains.kA());
 
     System.out.println(name + " gains set to " + gains);
   }

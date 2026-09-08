@@ -60,6 +60,7 @@ public class FlywheelSysIdCommands {
         .beforeStarting(stats::start)
         .finallyDo(
             (interrupted) -> {
+              flywheel.setVoltage(0);
               stats.finish();
               SysIdResultsPublisher.publish(testName, interrupted, stats);
             });

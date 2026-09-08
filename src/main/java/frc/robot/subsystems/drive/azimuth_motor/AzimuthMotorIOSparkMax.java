@@ -19,7 +19,6 @@ import com.revrobotics.spark.config.SparkMaxConfig;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
-import edu.wpi.first.wpilibj.RobotController;
 import frc.robot.constants.drive.AzimuthMotorConstants.AzimuthMotorGains;
 import frc.robot.constants.drive.AzimuthMotorConstants.AzimuthMotorHardwareConfig;
 import frc.robot.subsystems.drive.odometry_threads.SparkOdometryThread;
@@ -212,7 +211,7 @@ public class AzimuthMotorIOSparkMax implements AzimuthMotorIO {
       motorPositions[i] = motors[i].getEncoder().getPosition();
       motorVelocities[i] = motors[i].getEncoder().getVelocity();
 
-      motorVoltages[i] = motors[i].getAppliedOutput() * RobotController.getBatteryVoltage();
+      motorVoltages[i] = motors[i].getAppliedOutput() * motors[i].getBusVoltage();
       motorCurrents[i] = motors[i].getOutputCurrent();
 
       motorAlerts[i].set(!motorsConnected[i]);
@@ -224,6 +223,8 @@ public class AzimuthMotorIOSparkMax implements AzimuthMotorIO {
     inputs.motorVelocities = motorVelocities;
 
     inputs.motorVoltages = motorVoltages;
+    inputs.motorSupplyVoltages =
+        java.util.Arrays.stream(motors).mapToDouble(m -> m.getBusVoltage()).toArray();
     inputs.motorCurrents = motorCurrents;
 
     switch (hardwareConfig.encoderType()) {
