@@ -1,7 +1,6 @@
 package frc.robot.constants.drive;
 
 import edu.wpi.first.math.geometry.Rotation2d;
-import frc.robot.constants.drive.DriveConstants;
 
 public class AzimuthMotorConstants {
   // by default, the drive is set to the RoboRio's CANBus
