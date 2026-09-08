@@ -100,6 +100,7 @@ dependencies {
 
 test {
     useJUnitPlatform()
+    testLogging { exceptionFormat = 'full' }
     systemProperty 'junit.jupiter.extensions.autodetection.enabled', 'true'
 }
 
