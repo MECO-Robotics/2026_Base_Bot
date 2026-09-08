@@ -32,7 +32,8 @@ public class VisionIOLimelightSim extends VisionIOPhotonVisionSim {
               observation.ambiguity(),
               observation.tagCount(),
               observation.averageTagDistance(),
-              PoseObservationType.MEGATAG_1);
+              PoseObservationType.MEGATAG_1,
+              observation.tagIds());
     }
     inputs.poseObservations = limelightObservations;
   }

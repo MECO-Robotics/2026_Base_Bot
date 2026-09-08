@@ -31,7 +31,7 @@ import org.littletonrobotics.junction.Logger;
 public class Vision extends SubsystemBase {
   private final VisionConsumer consumer;
   private final VisionIO[] io;
-  private final VisionIOInputsAutoLogged[] inputs;
+  private final VisionIOInputsLogged[] inputs;
   private final Alert[] disconnectedAlerts;
 
   /**
@@ -45,9 +45,9 @@ public class Vision extends SubsystemBase {
     this.io = io;
 
     // Initialize inputs
-    this.inputs = new VisionIOInputsAutoLogged[io.length];
+    this.inputs = new VisionIOInputsLogged[io.length];
     for (int i = 0; i < inputs.length; i++) {
-      inputs[i] = new VisionIOInputsAutoLogged();
+      inputs[i] = new VisionIOInputsLogged();
     }
 
     // Initialize disconnected alerts
@@ -93,49 +93,11 @@ public class Vision extends SubsystemBase {
       List<Pose3d> robotPoses = new LinkedList<>();
       List<Pose3d> robotPosesAccepted = new LinkedList<>();
       List<Pose3d> robotPosesRejected = new LinkedList<>();
-      int observedWhitelistedTagCount = 0;
-
-      // Add tag poses
-      for (int tagId : inputs[cameraIndex].tagIds) {
-        if (whitelistedTagIds.isEmpty() || whitelistedTagIds.contains(tagId)) {
-          var tagPose = aprilTagLayout.getTagPose(tagId);
-          if (tagPose.isPresent()) {
-            tagPoses.add(tagPose.get());
-          }
-          observedWhitelistedTagCount++;
-        }
-      }
-      boolean hasEnoughWhitelistedTags =
-          observedWhitelistedTagCount >= minWhitelistedTagCountForOdometry;
-      Logger.recordOutput(
-          "Vision/Camera" + Integer.toString(cameraIndex) + "/ObservedWhitelistedTagCount",
-          observedWhitelistedTagCount);
-
-      // Loop over pose observations
+      for (int tagId : inputs[cameraIndex].tagIds)
+        aprilTagLayout.getTagPose(tagId).ifPresent(tagPoses::add);
       for (var observation : inputs[cameraIndex].poseObservations) {
         boolean isQuestNav = observation.type() == PoseObservationType.QUESTNAV;
-        boolean enforceWhitelistedTagMinimum =
-            !isQuestNav && !whitelistedTagIds.isEmpty() && minWhitelistedTagCountForOdometry > 0;
-        // Check whether to reject pose
-        boolean rejectPose =
-            (!isQuestNav && observation.tagCount() < minTagCountForOdometry) // Must have
-                // enough tags
-                || (!isQuestNav
-                    && observation.tagCount() == 1
-                    && observation.ambiguity() > maxAmbiguity)
-                // Single-tag solve must not be too ambiguous
-                || (enforceWhitelistedTagMinimum
-                    && !hasEnoughWhitelistedTags) // Must include enough
-                // currently-whitelisted tags
-                || Math.abs(observation.pose().getZ())
-                    > maxZError // Must have realistic Z coordinate
-
-                // Must be within the field boundaries
-                || observation.pose().getX() < 0.0
-                || observation.pose().getX() > aprilTagLayout.getFieldLength()
-                || observation.pose().getY() < 0.0
-                || observation.pose().getY() > aprilTagLayout.getFieldWidth();
-
+        boolean rejectPose = !VisionObservationFilter.accepts(observation, whitelistedTagIds, true);
         // Add pose to log
         robotPoses.add(observation.pose());
         if (rejectPose) {

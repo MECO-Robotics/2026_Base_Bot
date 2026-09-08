@@ -14,12 +14,10 @@ import edu.wpi.first.math.geometry.Transform3d;
 import frc.robot.constants.Constants;
 import frc.robot.subsystems.vision.VisionIOLimelight.LimelightPoseMode;
 import java.util.function.Supplier;
-import org.littletonrobotics.junction.AutoLog;
 
 /** Hardware abstraction for vision cameras and pose-estimation pipelines. */
 public interface VisionIO {
   /** Logged inputs shared by all vision implementations. */
-  @AutoLog
   public static class VisionIOInputs {
     /** True when the camera/pipeline is connected and publishing data. */
     public boolean connected = false;
@@ -42,7 +40,12 @@ public interface VisionIO {
       double ambiguity,
       int tagCount,
       double averageTagDistance,
-      PoseObservationType type) {}
+      PoseObservationType type,
+      java.util.Set<Integer> tagIds) {
+    public PoseObservation {
+      tagIds = java.util.Set.copyOf(tagIds);
+    }
+  }
 
   public static enum PoseObservationType {
     MEGATAG_1,
