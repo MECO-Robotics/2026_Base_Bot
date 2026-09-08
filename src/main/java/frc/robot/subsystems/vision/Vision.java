@@ -22,14 +22,24 @@ import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.subsystems.vision.VisionIO.PoseObservationType;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import org.littletonrobotics.junction.Logger;
 
+/**
+ * Aggregates camera inputs, filters observations, and feeds accepted poses to drivetrain odometry.
+ */
 public class Vision extends SubsystemBase {
   private final VisionConsumer consumer;
   private final VisionIO[] io;
   private final VisionIOInputsAutoLogged[] inputs;
   private final Alert[] disconnectedAlerts;
 
+  /**
+   * Creates the vision subsystem.
+   *
+   * @param consumer callback for accepted vision measurements
+   * @param io one or more camera IO implementations
+   */
   public Vision(VisionConsumer consumer, VisionIO... io) {
     this.consumer = consumer;
     this.io = io;
@@ -60,6 +70,8 @@ public class Vision extends SubsystemBase {
 
   @Override
   public void periodic() {
+    Set<Integer> whitelistedTagIds = getOdometryTagWhitelistForCurrentAlliance();
+
     for (int i = 0; i < io.length; i++) {
       io[i].updateInputs(inputs[i]);
       Logger.processInputs("Vision/Camera" + Integer.toString(i), inputs[i]);
@@ -81,22 +93,40 @@ public class Vision extends SubsystemBase {
       List<Pose3d> robotPoses = new LinkedList<>();
       List<Pose3d> robotPosesAccepted = new LinkedList<>();
       List<Pose3d> robotPosesRejected = new LinkedList<>();
+      int observedWhitelistedTagCount = 0;
 
       // Add tag poses
       for (int tagId : inputs[cameraIndex].tagIds) {
-        var tagPose = aprilTagLayout.getTagPose(tagId);
-        if (tagPose.isPresent()) {
-          tagPoses.add(tagPose.get());
+        if (whitelistedTagIds.isEmpty() || whitelistedTagIds.contains(tagId)) {
+          var tagPose = aprilTagLayout.getTagPose(tagId);
+          if (tagPose.isPresent()) {
+            tagPoses.add(tagPose.get());
+          }
+          observedWhitelistedTagCount++;
         }
       }
+      boolean hasEnoughWhitelistedTags =
+          observedWhitelistedTagCount >= minWhitelistedTagCountForOdometry;
+      Logger.recordOutput(
+          "Vision/Camera" + Integer.toString(cameraIndex) + "/ObservedWhitelistedTagCount",
+          observedWhitelistedTagCount);
 
       // Loop over pose observations
       for (var observation : inputs[cameraIndex].poseObservations) {
+        boolean isQuestNav = observation.type() == PoseObservationType.QUESTNAV;
+        boolean enforceWhitelistedTagMinimum =
+            !isQuestNav && !whitelistedTagIds.isEmpty() && minWhitelistedTagCountForOdometry > 0;
         // Check whether to reject pose
         boolean rejectPose =
-            observation.tagCount() == 0 // Must have at least one tag
-                || (observation.tagCount() == 1
-                    && observation.ambiguity() > maxAmbiguity) // Cannot be high ambiguity
+            (!isQuestNav && observation.tagCount() < minTagCountForOdometry) // Must have
+                // enough tags
+                || (!isQuestNav
+                    && observation.tagCount() == 1
+                    && observation.ambiguity() > maxAmbiguity)
+                // Single-tag solve must not be too ambiguous
+                || (enforceWhitelistedTagMinimum
+                    && !hasEnoughWhitelistedTags) // Must include enough
+                // currently-whitelisted tags
                 || Math.abs(observation.pose().getZ())
                     > maxZError // Must have realistic Z coordinate
 
@@ -120,10 +150,17 @@ public class Vision extends SubsystemBase {
         }
 
         // Calculate standard deviations
-        double stdDevFactor =
-            Math.pow(observation.averageTagDistance(), 2.0) / observation.tagCount();
-        double linearStdDev = linearStdDevBaseline * stdDevFactor;
-        double angularStdDev = angularStdDevBaseline * stdDevFactor;
+        double linearStdDev;
+        double angularStdDev;
+        if (isQuestNav) {
+          linearStdDev = linearStdDevBaseline;
+          angularStdDev = angularStdDevBaseline;
+        } else {
+          double stdDevFactor =
+              Math.pow(observation.averageTagDistance(), 2.0) / observation.tagCount();
+          linearStdDev = linearStdDevBaseline * stdDevFactor;
+          angularStdDev = angularStdDevBaseline * stdDevFactor;
+        }
         if (observation.type() == PoseObservationType.MEGATAG_2) {
           linearStdDev *= linearStdDevMegatag2Factor;
           angularStdDev *= angularStdDevMegatag2Factor;
@@ -133,9 +170,10 @@ public class Vision extends SubsystemBase {
           angularStdDev *= cameraStdDevFactors[cameraIndex];
         }
 
-        // Send vision observation
+        // Send vision observation (optionally flip QuestNav about field center)
+        Pose2d visionPose2d = observation.pose().toPose2d();
         consumer.accept(
-            observation.pose().toPose2d(),
+            visionPose2d,
             observation.timestamp(),
             VecBuilder.fill(linearStdDev, linearStdDev, angularStdDev));
       }
@@ -169,6 +207,7 @@ public class Vision extends SubsystemBase {
   }
 
   @FunctionalInterface
+  /** Callback used to hand accepted vision observations to consumers (typically drivetrain). */
   public static interface VisionConsumer {
     public void accept(
         Pose2d visionRobotPoseMeters,
