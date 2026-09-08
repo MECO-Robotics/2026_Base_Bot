@@ -39,280 +39,309 @@ import frc.robot.util.encoder.IAbsoluteEncoder;
 import java.util.ArrayList;
 import java.util.function.DoubleSupplier;
 
+/** TalonFX-backed implementation of {@link PositionJointIO}. */
 public class PositionJointIOTalonFX implements PositionJointIO {
-  private final String name;
-  private final PositionJointHardwareConfig hardwareConfig;
-  private final DoubleSupplier externalFeedforward;
-  private final TalonFX[] motors;
-  private final TalonFXConfiguration leaderConfig;
-  private final IAbsoluteEncoder externalEncoder;
-  private final VoltageOut voltageRequest = new VoltageOut(0);
-  private final MotionMagicVoltage positionRequest = new MotionMagicVoltage(0);
-  private final DynamicMotionMagicVoltage dynamicPositionRequest = new DynamicMotionMagicVoltage(0, 0, 0);
-  private final StatusSignal<Angle> outputPosition;
-  private final StatusSignal<Angle> rotorPosition;
-  private final StatusSignal<AngularVelocity> velocity;
-  private final ArrayList<StatusSignal<Angle>> positions = new ArrayList<>();
-  private final ArrayList<StatusSignal<AngularVelocity>> velocities = new ArrayList<>();
-  private final ArrayList<StatusSignal<Voltage>> voltages = new ArrayList<>();
-  private final ArrayList<StatusSignal<Current>> currents = new ArrayList<>();
-  private final boolean[] motorsConnected;
-  private boolean encoderConnected;
-  private final double[] motorPositions;
-  private final double[] motorVelocities;
-  private final double[] motorVoltages;
-  private final double[] motorCurrents;
-  private final Alert[] motorAlerts;
-  private final Alert encoderAlert;
-  private double positionSetpoint = 0.0;
-  private double velocitySetpoint = 0.0;
-  private MotorAlignmentValue motorval;
+	private final String name;
 
-  public PositionJointIOTalonFX(
-      String name, PositionJointHardwareConfig config, DoubleSupplier externalFeedforward) {
-    this.name = name;
-    hardwareConfig = config;
-    this.externalFeedforward = externalFeedforward;
-    CANBus canBus = new CANBus(config.canBus());
+	private final PositionJointHardwareConfig hardwareConfig;
 
-    int numMotors = config.canIds().length;
-    motors = new TalonFX[numMotors];
-    motorsConnected = new boolean[numMotors];
-    motorPositions = new double[numMotors];
-    motorVelocities = new double[numMotors];
-    motorVoltages = new double[numMotors];
-    motorCurrents = new double[numMotors];
-    motorAlerts = new Alert[numMotors];
+	private final DoubleSupplier externalFeedforward;
 
-    motors[0] = new TalonFX(config.canIds()[0], canBus);
-    leaderConfig =
-        new TalonFXConfiguration()
-            .withMotorOutput(
-                new MotorOutputConfigs()
-                    .withNeutralMode(NeutralModeValue.Brake)
-                    .withInverted(
-                        config.reversed()[0]
-                            ? InvertedValue.Clockwise_Positive
-                            : InvertedValue.CounterClockwise_Positive))
-            .withCurrentLimits(
-                new CurrentLimitsConfigs()
-                    .withSupplyCurrentLimit(config.currentLimit())
-                    .withSupplyCurrentLimitEnable(true));
+	private final TalonFX[] motors;
+	private final TalonFXConfiguration leaderConfig;
 
-    switch (hardwareConfig.encoderType()) {
-      case INTERNAL:
-        externalEncoder = new IAbsoluteEncoder() {};
-        encoderAlert = new Alert(name, name + " does not use an external encoder", AlertType.kInfo);
-        leaderConfig.withFeedback(
-            new FeedbackConfigs()
-                .withSensorToMechanismRatio(config.gearRatio())
-                .withFeedbackSensorSource(FeedbackSensorSourceValue.RotorSensor));
-        tryUntilOk(5, () -> motors[0].getConfigurator().apply(leaderConfig));
-        break;
-      case EXTERNAL_CANCODER:
-        externalEncoder =
-            new AbsoluteCancoder(
-                config.encoderID(),
-                config.canBus(),
-                new CANcoderConfiguration()
-                    .withMagnetSensor(
-                        new MagnetSensorConfigs()
-                            .withSensorDirection(SensorDirectionValue.CounterClockwise_Positive)
-                            .withMagnetOffset(config.encoderOffset().getMeasure())));
-        encoderAlert =
-            new Alert(name, name + " CANCoder Disconnected! CAN ID: " + config.encoderID(), AlertType.kError);
-        leaderConfig.withFeedback(
-            new FeedbackConfigs()
-                .withFeedbackRemoteSensorID(config.encoderID())
-                .withSensorToMechanismRatio(1.0)
-                .withRotorToSensorRatio(config.gearRatio())
-                .withFeedbackSensorSource(FeedbackSensorSourceValue.RemoteCANcoder));
-        tryUntilOk(5, () -> motors[0].getConfigurator().apply(leaderConfig));
-        break;
-      case EXTERNAL_CANCODER_PRO:
-        externalEncoder =
-            new AbsoluteCancoder(
-                config.encoderID(),
-                config.canBus(),
-                new CANcoderConfiguration()
-                    .withMagnetSensor(
-                        new MagnetSensorConfigs()
-                            .withSensorDirection(SensorDirectionValue.CounterClockwise_Positive)
-                            .withMagnetOffset(config.encoderOffset().getMeasure())));
-        encoderAlert =
-            new Alert(name, name + " CANCoder Disconnected! CAN ID: " + config.encoderID(), AlertType.kError);
-        leaderConfig.withFeedback(
-            new FeedbackConfigs()
-                .withFeedbackRemoteSensorID(config.encoderID())
-                .withSensorToMechanismRatio(1.0)
-                .withRotorToSensorRatio(config.gearRatio())
-                .withFeedbackSensorSource(FeedbackSensorSourceValue.FusedCANcoder));
-        tryUntilOk(5, () -> motors[0].getConfigurator().apply(leaderConfig));
-        break;
-      case EXTERNAL_DIO:
-        externalEncoder = new AbsoluteMagEncoder(config.encoderID());
-        encoderAlert =
-            new Alert(name, name + " DIO Encoder Disconnected! DIO ID: " + config.encoderID(), AlertType.kWarning);
-        tryUntilOk(5, () -> motors[0].getConfigurator().apply(leaderConfig));
-        motors[0].setPosition(externalEncoder.getAbsoluteAngle().plus(config.encoderOffset()).getMeasure());
-        break;
-      case EXTERNAL_SPARK:
-        throw new IllegalArgumentException("ENCODER_SPARK is not supported for TalonFX");
-      default:
-        externalEncoder = new IAbsoluteEncoder() {};
-        encoderAlert = new Alert(name, name + " does not use an external encoder", AlertType.kInfo);
-        break;
-    }
+	private final IAbsoluteEncoder externalEncoder;
 
-    outputPosition = motors[0].getPosition();
-    rotorPosition = motors[0].getRotorPosition();
-    velocity = motors[0].getVelocity();
+	private final VoltageOut voltageRequest = new VoltageOut(0);
+	private final MotionMagicVoltage positionRequest = new MotionMagicVoltage(0);
+	private final DynamicMotionMagicVoltage dynamicPositionRequest = new DynamicMotionMagicVoltage(0, 0, 0);
 
-    positions.add(motors[0].getPosition());
-    velocities.add(motors[0].getVelocity());
-    voltages.add(motors[0].getSupplyVoltage());
-    currents.add(motors[0].getStatorCurrent());
+	private final StatusSignal<Angle> outputPosition;
+	private final StatusSignal<Angle> rotorPosition;
+	private final StatusSignal<AngularVelocity> velocity;
 
-    motorAlerts[0] =
-        new Alert(name, name + " Leader Motor Disconnected! CAN ID: " + config.canIds()[0], AlertType.kError);
-    for (int i = 1; i < config.canIds().length; i++) {
-      motorval = config.reversed()[i] ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned;
-      motors[i] = new TalonFX(config.canIds()[i], canBus);
-      motors[i].setControl(new Follower(motors[0].getDeviceID(), motorval));
-      motorAlerts[i] =
-          new Alert(
-              name, name + " Follower Motor " + i + " Disconnected! CAN ID: " + config.canIds()[i], AlertType.kError);
-      positions.add(motors[i].getPosition());
-      velocities.add(motors[i].getVelocity());
-      voltages.add(motors[i].getSupplyVoltage());
-      currents.add(motors[i].getStatorCurrent());
-    }
-  }
+	private final ArrayList<StatusSignal<Angle>> positions = new ArrayList<>();
+	private final ArrayList<StatusSignal<AngularVelocity>> velocities = new ArrayList<>();
 
-  public PositionJointIOTalonFX(String name, PositionJointHardwareConfig config) {
-    this(name, config, () -> 0);
-  }
+	private final ArrayList<StatusSignal<Voltage>> voltages = new ArrayList<>();
+	private final ArrayList<StatusSignal<Current>> currents = new ArrayList<>();
 
-  @Override
-  public void updateInputs(PositionJointIOInputs inputs) {
-    BaseStatusSignal.refreshAll(outputPosition, rotorPosition, velocity);
-    inputs.outputPosition = outputPosition.getValueAsDouble();
-    inputs.rotorPosition = rotorPosition.getValueAsDouble();
-    inputs.velocity = velocity.getValueAsDouble();
-    inputs.desiredPosition = positionSetpoint;
-    inputs.desiredVelocity = velocitySetpoint;
+	private final boolean[] motorsConnected;
+	private boolean encoderConnected;
 
-    for (int i = 0; i < motors.length; i++) {
-      motorsConnected[i] =
-          BaseStatusSignal.refreshAll(positions.get(i), velocities.get(i), voltages.get(i), currents.get(i)).isOK();
-      motorPositions[i] = positions.get(i).getValueAsDouble();
-      motorVelocities[i] = velocities.get(i).getValueAsDouble();
-      motorVoltages[i] = voltages.get(i).getValueAsDouble();
-      motorCurrents[i] = motors[i].getStatorCurrent().getValueAsDouble();
-      motorAlerts[i].set(!motorsConnected[i]);
-    }
+	private final double[] motorPositions;
+	private final double[] motorVelocities;
 
-    inputs.motorsConnected = motorsConnected;
-    inputs.motorPositions = motorPositions;
-    inputs.motorVelocities = motorVelocities;
-    inputs.motorVoltages = motorVoltages;
-    inputs.motorCurrents = motorCurrents;
+	private final double[] motorVoltages;
+	private final double[] motorCurrents;
 
-    switch (hardwareConfig.encoderType()) {
-      case INTERNAL:
-        encoderConnected = false;
-        break;
-      case EXTERNAL_CANCODER:
-      case EXTERNAL_CANCODER_PRO:
-        encoderConnected = BaseStatusSignal.refreshAll(rotorPosition).isOK();
-        break;
-      case EXTERNAL_DIO:
-        encoderConnected = externalEncoder.isConnected();
-        break;
-      case EXTERNAL_SPARK:
-        encoderConnected = false;
-        break;
-    }
+	private final Alert[] motorAlerts;
+	private final Alert encoderAlert;
 
-    encoderAlert.set(!encoderConnected);
-    inputs.encoderConnected = encoderConnected;
-  }
+	private double positionSetpoint = 0.0;
+	private double velocitySetpoint = 0.0;
 
-  @Override
-  public void setPosition(double position, double velocity) {
-    positionSetpoint = position;
-    velocitySetpoint = velocity;
-    motors[0].setControl(positionRequest.withPosition(position).withFeedForward(externalFeedforward.getAsDouble()));
-    for (int i = 1; i < motors.length; i++) {
-      motorval = hardwareConfig.reversed()[i] ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned;
-      motors[i].setControl(new Follower(motors[0].getDeviceID(), motorval));
-    }
-  }
+	private MotorAlignmentValue motorval;
 
-  @Override
-  public boolean setPositionDynamic(double position, double maxVelocity, double maxAcceleration) {
-    positionSetpoint = position;
-    velocitySetpoint = 0.0;
-    motors[0].setControl(
-        dynamicPositionRequest
-            .withPosition(position)
-            .withVelocity(Math.abs(maxVelocity))
-            .withAcceleration(Math.abs(maxAcceleration))
-            .withFeedForward(externalFeedforward.getAsDouble()));
-    for (int i = 1; i < motors.length; i++) {
-      motorval = hardwareConfig.reversed()[i] ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned;
-      motors[i].setControl(new Follower(motors[0].getDeviceID(), motorval));
-    }
-    return true;
-  }
+	/**
+	 * Creates a TalonFX position-joint IO implementation.
+	 *
+	 * @param name
+	 *            subsystem/logging name
+	 * @param config
+	 *            hardware configuration and encoder source
+	 * @param externalFeedforward
+	 *            additional feedforward term supplied by higher-level code
+	 */
+	public PositionJointIOTalonFX(String name, PositionJointHardwareConfig config, DoubleSupplier externalFeedforward) {
+		this.name = name;
+		hardwareConfig = config;
+		this.externalFeedforward = externalFeedforward;
+		CANBus canBus = new CANBus(config.canBus());
+		int numMotors = config.canIds().length;
 
-  @Override
-  public void setVoltage(double voltage) {
-    motors[0].setControl(voltageRequest.withOutput(voltage));
-    for (int i = 1; i < motors.length; i++) {
-      motorval = hardwareConfig.reversed()[i] ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned;
-      motors[i].setControl(new Follower(motors[0].getDeviceID(), motorval));
-    }
-  }
+		assert numMotors > 0 && (numMotors == config.reversed().length);
 
-  @Override
-  public void setGains(PositionJointGains gains) {
-    GravityTypeValue gravity;
-    if (hardwareConfig.gravity() == GravityType.CONSTANT) {
-      gravity = GravityTypeValue.Elevator_Static;
-    } else if (hardwareConfig.gravity() == GravityType.COSINE) {
-      gravity = GravityTypeValue.Arm_Cosine;
-    } else {
-      throw new IllegalArgumentException("SINE gravity is not supported for TalonFX");
-    }
+		motors = new TalonFX[numMotors];
+		motorsConnected = new boolean[numMotors];
+		motorPositions = new double[numMotors];
+		motorVelocities = new double[numMotors];
+		motorVoltages = new double[numMotors];
+		motorCurrents = new double[numMotors];
+		motorAlerts = new Alert[numMotors];
 
-    motors[0]
-        .getConfigurator()
-        .apply(
-            new Slot0Configs()
-                .withKP(gains.kP())
-                .withKI(gains.kI())
-                .withKD(gains.kD())
-                .withKV(gains.kV())
-                .withKA(gains.kA())
-                .withKS(gains.kS())
-                .withKG(gains.kG())
-                .withGravityType(gravity));
-    motors[0]
-        .getConfigurator()
-        .apply(
-            new MotionMagicConfigs()
-                .withMotionMagicCruiseVelocity(gains.kMaxVelo())
-                .withMotionMagicAcceleration(gains.kMaxAccel()));
-  }
+		motors[0] = new TalonFX(config.canIds()[0], canBus);
+		leaderConfig = new TalonFXConfiguration()
+				.withMotorOutput(new MotorOutputConfigs().withNeutralMode(NeutralModeValue.Brake)
+						.withInverted(config.reversed()[0]
+								? InvertedValue.Clockwise_Positive
+								: InvertedValue.CounterClockwise_Positive))
+				.withCurrentLimits(new CurrentLimitsConfigs().withSupplyCurrentLimit(config.currentLimit())
+						.withSupplyCurrentLimitEnable(true));
 
-  @Override
-  public void resetPosition() {
-    motors[0].setPosition(0);
-  }
+		switch (hardwareConfig.encoderType()) {
+			case INTERNAL :
+				externalEncoder = new IAbsoluteEncoder() {
+				};
 
-  @Override
-  public String getName() {
-    return name;
-  }
+				encoderAlert = new Alert(name, name + " does not use an external encoder 💀", AlertType.kInfo);
+
+				leaderConfig.withFeedback(new FeedbackConfigs().withSensorToMechanismRatio(config.gearRatio())
+						.withFeedbackSensorSource(FeedbackSensorSourceValue.RotorSensor));
+
+				tryUntilOk(5, () -> motors[0].getConfigurator().apply(leaderConfig));
+				break;
+			case EXTERNAL_CANCODER :
+				externalEncoder = new AbsoluteCancoder(config.encoderID(), config.canBus(),
+						new CANcoderConfiguration().withMagnetSensor(new MagnetSensorConfigs()
+								.withSensorDirection(SensorDirectionValue.CounterClockwise_Positive)
+								.withMagnetOffset(config.encoderOffset().getMeasure())));
+
+				encoderAlert = new Alert(name, name + " CANCoder Disconnected! CAN ID: " + config.encoderID(),
+						AlertType.kError);
+
+				leaderConfig.withFeedback(new FeedbackConfigs().withFeedbackRemoteSensorID(config.encoderID())
+						.withSensorToMechanismRatio(1.0).withRotorToSensorRatio(config.gearRatio())
+						.withFeedbackSensorSource(FeedbackSensorSourceValue.RemoteCANcoder));
+
+				tryUntilOk(5, () -> motors[0].getConfigurator().apply(leaderConfig));
+				break;
+			case EXTERNAL_CANCODER_PRO :
+				externalEncoder = new AbsoluteCancoder(config.encoderID(), config.canBus(),
+						new CANcoderConfiguration().withMagnetSensor(new MagnetSensorConfigs()
+								.withSensorDirection(SensorDirectionValue.CounterClockwise_Positive)
+								.withMagnetOffset(config.encoderOffset().getMeasure())));
+
+				encoderAlert = new Alert(name, name + " CANCoder Disconnected! CAN ID: " + config.encoderID(),
+						AlertType.kError);
+
+				leaderConfig.withFeedback(new FeedbackConfigs().withFeedbackRemoteSensorID(config.encoderID())
+						.withSensorToMechanismRatio(1.0).withRotorToSensorRatio(config.gearRatio())
+						.withFeedbackSensorSource(FeedbackSensorSourceValue.FusedCANcoder));
+
+				tryUntilOk(5, () -> motors[0].getConfigurator().apply(leaderConfig));
+				break;
+			case EXTERNAL_DIO :
+				externalEncoder = new AbsoluteMagEncoder(config.encoderID());
+
+				encoderAlert = new Alert(name, name + " DIO Encoder Disconnected! DIO ID: " + config.encoderID(),
+						AlertType.kWarning);
+
+				tryUntilOk(5, () -> motors[0].getConfigurator().apply(leaderConfig));
+
+				motors[0].setPosition(externalEncoder.getAbsoluteAngle().plus(config.encoderOffset()).getMeasure());
+				break;
+			case EXTERNAL_SPARK :
+				throw new IllegalArgumentException("ENCODER_SPARK is not supported for TalonFX");
+			default :
+				externalEncoder = new IAbsoluteEncoder() {
+				};
+				encoderAlert = new Alert(name, name + " does not use an external encoder 💀", AlertType.kInfo);
+				break;
+		}
+
+		outputPosition = motors[0].getPosition();
+		rotorPosition = motors[0].getRotorPosition();
+		velocity = motors[0].getVelocity();
+
+		positions.add(motors[0].getPosition());
+		velocities.add(motors[0].getVelocity());
+
+		voltages.add(motors[0].getSupplyVoltage());
+		currents.add(motors[0].getStatorCurrent());
+
+		motorAlerts[0] = new Alert(name, name + " Leader Motor Disconnected! CAN ID: " + config.canIds()[0],
+				AlertType.kError);
+
+		for (int i = 1; i < config.canIds().length; i++) {
+			motorval = config.reversed()[i] ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned;
+			motors[i] = new TalonFX(config.canIds()[i], canBus);
+			motors[i].setControl(new Follower(motors[0].getDeviceID(), motorval));
+
+			motorAlerts[i] = new Alert(name,
+					name + " Follower Motor " + i + " Disconnected! CAN ID: " + config.canIds()[i], AlertType.kError);
+
+			positions.add(motors[i].getPosition());
+			velocities.add(motors[i].getVelocity());
+
+			voltages.add(motors[i].getSupplyVoltage());
+			currents.add(motors[i].getStatorCurrent());
+		}
+	}
+
+	public PositionJointIOTalonFX(String name, PositionJointHardwareConfig config) {
+		this(name, config, () -> 0);
+	}
+
+	/**
+	 * Refreshes Talon, follower, and encoder telemetry used by the subsystem layer.
+	 */
+	@Override
+	public void updateInputs(PositionJointIOInputs inputs) {
+		BaseStatusSignal.refreshAll(outputPosition, rotorPosition, velocity);
+
+		inputs.outputPosition = outputPosition.getValueAsDouble();
+		inputs.rotorPosition = rotorPosition.getValueAsDouble();
+		inputs.velocity = velocity.getValueAsDouble();
+
+		inputs.desiredPosition = positionSetpoint;
+		inputs.desiredVelocity = velocitySetpoint;
+
+		for (int i = 0; i < motors.length; i++) {
+			// Do not refresh the three status signals above
+			motorsConnected[i] = BaseStatusSignal
+					.refreshAll(positions.get(i), velocities.get(i), voltages.get(i), currents.get(i)).isOK();
+
+			motorPositions[i] = positions.get(i).getValueAsDouble();
+			motorVelocities[i] = velocities.get(i).getValueAsDouble();
+
+			motorVoltages[i] = voltages.get(i).getValueAsDouble();
+			motorCurrents[i] = motors[i].getStatorCurrent().getValueAsDouble();
+
+			motorAlerts[i].set(!motorsConnected[i]);
+		}
+
+		inputs.motorsConnected = motorsConnected;
+
+		inputs.motorPositions = motorPositions;
+		inputs.motorVelocities = motorVelocities;
+
+		inputs.motorVoltages = motorVoltages;
+		inputs.motorCurrents = motorCurrents;
+
+		switch (hardwareConfig.encoderType()) {
+			case INTERNAL :
+				encoderConnected = false;
+				break;
+			case EXTERNAL_CANCODER :
+				encoderConnected = BaseStatusSignal.refreshAll(rotorPosition).isOK();
+				break;
+			case EXTERNAL_CANCODER_PRO :
+				encoderConnected = BaseStatusSignal.refreshAll(rotorPosition).isOK();
+				break;
+			case EXTERNAL_DIO :
+				encoderConnected = externalEncoder.isConnected();
+				break;
+			case EXTERNAL_SPARK :
+				encoderConnected = false;
+				break;
+		}
+
+		encoderAlert.set(!encoderConnected);
+		inputs.encoderConnected = encoderConnected;
+	}
+
+	/**
+	 * Commands Motion Magic position control with the configured feedforward term.
+	 */
+	@Override
+	public void setPosition(double position, double velocity) {
+		positionSetpoint = position;
+		velocitySetpoint = velocity;
+
+		motors[0].setControl(positionRequest.withPosition(position).withFeedForward(externalFeedforward.getAsDouble()));
+		for (int i = 1; i < motors.length; i++) {
+			motorval = hardwareConfig.reversed()[i] ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned;
+			motors[i].setControl(new Follower(motors[0].getDeviceID(), motorval));
+		}
+	}
+
+	/**
+	 * Commands Motion Magic with temporary cruise velocity and acceleration limits.
+	 */
+	@Override
+	public boolean setPositionDynamic(double position, double maxVelocity, double maxAcceleration) {
+		positionSetpoint = position;
+		velocitySetpoint = 0.0;
+
+		motors[0].setControl(dynamicPositionRequest.withPosition(position).withVelocity(Math.abs(maxVelocity))
+				.withAcceleration(Math.abs(maxAcceleration)).withFeedForward(externalFeedforward.getAsDouble()));
+		for (int i = 1; i < motors.length; i++) {
+			motorval = hardwareConfig.reversed()[i] ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned;
+			motors[i].setControl(new Follower(motors[0].getDeviceID(), motorval));
+		}
+		return true;
+	}
+
+	/** Applies open-loop voltage to the leader and reasserts follower mode. */
+	@Override
+	public void setVoltage(double voltage) {
+		motors[0].setControl(voltageRequest.withOutput(voltage));
+		for (int i = 1; i < motors.length; i++) {
+			motorval = hardwareConfig.reversed()[i] ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned;
+			motors[i].setControl(new Follower(motors[0].getDeviceID(), motorval));
+		}
+	}
+
+	/** Applies slot gains and Motion Magic constraints to the leader TalonFX. */
+	@Override
+	public void setGains(PositionJointGains gains) {
+		GravityTypeValue gravity;
+		if (hardwareConfig.gravityType() == GravityType.CONSTANT) {
+			gravity = GravityTypeValue.Elevator_Static;
+		} else if (hardwareConfig.gravityType() == GravityType.COSINE) {
+			gravity = GravityTypeValue.Arm_Cosine;
+		} else {
+			throw new IllegalArgumentException("SINE gravity is not supported for TalonFX");
+		}
+
+		motors[0].getConfigurator().apply(new Slot0Configs().withKP(gains.kP()).withKI(gains.kI()).withKD(gains.kD())
+				.withKV(gains.kV()).withKA(gains.kA()).withKS(gains.kS()).withKG(gains.kG()).withGravityType(gravity));
+		motors[0].getConfigurator().apply(new MotionMagicConfigs().withMotionMagicCruiseVelocity(gains.kMaxVelo())
+				.withMotionMagicAcceleration(gains.kMaxAccel()));
+
+		System.out.println(name + " gains set to " + gains);
+	}
+
+	/** Zeros the TalonFX integrated position reference. */
+	@Override
+	public void resetPosition() {
+		motors[0].setPosition(0);
+	}
+
+	/** Returns this joint's loggable subsystem name. */
+	@Override
+	public String getName() {
+		return name;
+	}
 }
