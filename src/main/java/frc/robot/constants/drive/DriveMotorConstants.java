@@ -1,7 +1,5 @@
 package frc.robot.constants.drive;
 
-import frc.robot.constants.drive.DriveConstants;
-
 public class DriveMotorConstants {
   // by default, the drive is set to the RoboRio's CANBus
   // change this value if using CANivore to CANivore's Bus name, set in Phoenix Tuner X
