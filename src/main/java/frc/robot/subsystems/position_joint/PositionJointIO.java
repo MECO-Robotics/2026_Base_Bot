@@ -2,6 +2,7 @@ package frc.robot.subsystems.position_joint;
 
 import edu.wpi.first.math.system.plant.DCMotor;
 import frc.robot.constants.Constants;
+import frc.robot.constants.types.PositionJointConstants.JointSimulationConfig;
 import frc.robot.constants.types.PositionJointConstants.PositionJointGains;
 import frc.robot.constants.types.PositionJointConstants.PositionJointHardwareConfig;
 import java.util.function.Supplier;
@@ -12,8 +13,8 @@ public interface PositionJointIO {
   /**
    * Logged inputs shared by all joint implementations.
    *
-   * <p>Units are rotations and rotations/sec unless otherwise documented by a specific
-   * implementation.
+   * <p>Output units are rotations and rotations/sec for angular joints, metres and metres/sec for
+   * linear joints. Motor telemetry uses rotor rotations and rotations/sec.
    */
   @AutoLog
   public static class PositionJointIOInputs {
@@ -43,6 +44,9 @@ public interface PositionJointIO {
 
     /** Per-motor applied voltage telemetry. */
     public double[] motorVoltages = {0.0};
+
+    /** Per-controller measured supply voltage, separately from applied motor voltage. */
+    public double[] motorSupplyVoltages = {0.0};
     /** Per-motor current draw telemetry. */
     public double[] motorCurrents = {0.0};
   }
@@ -50,8 +54,8 @@ public interface PositionJointIO {
   /** Refreshes all sensor and diagnostic inputs. */
   public default void updateInputs(PositionJointIOInputs inputs) {}
 
-  /** Commands joint position/velocity setpoints for closed-loop control. */
-  public default void setPosition(double position, double velocity) {}
+  /** Commands a joint position with the configured default profile constraints. */
+  public default void setPosition(double position) {}
 
   /**
    * Commands a dynamic closed-loop position request with runtime profile constraints.
@@ -72,8 +76,12 @@ public interface PositionJointIO {
   /** Applies controller/feedforward gains. */
   public default void setGains(PositionJointGains gains) {}
 
-  /** Resets mechanism position to the implementation-defined zero. */
+  /** Zeros the reported reference without changing physical position, velocity, or calibration. */
   public default void resetPosition() {}
+
+  public default double getPositionOffset() {
+    return 0;
+  }
 
   /** Creates a replay position-joint IO supplier. */
   public static Supplier<PositionJointIO> replayFactory(String name) {
@@ -86,40 +94,42 @@ public interface PositionJointIO {
         };
   }
 
-  /**
-   * Creates a mode-appropriate position joint IO.
-   *
-   * <p>Returns the supplied real implementation on real hardware, inert IO in sim and replay. Use
-   * the vendor-specific factories below for physics simulation.
-   */
+  /** Selects an implementation without constructing unused hardware or physics. */
   public static PositionJointIO fromMode(
+      String name, Supplier<PositionJointIO> real, Supplier<PositionJointIO> sim) {
+    return selectMode(Constants.currentMode, name, real, sim);
+  }
+
+  public static PositionJointIO selectMode(
+      Constants.Mode mode,
       String name,
-      PositionJointHardwareConfig config,
-      Supplier<PositionJointIO> subsystemSupplier,
-      DCMotor simMotorModel) {
-    return switch (Constants.currentMode) {
-      case REAL -> subsystemSupplier.get();
-      case SIM -> replayFactory(name).get();
-      default -> replayFactory(name).get();
+      Supplier<PositionJointIO> real,
+      Supplier<PositionJointIO> sim) {
+    return switch (mode) {
+      case REAL -> real.get();
+      case SIM -> sim.get();
+      case REPLAY -> replayFactory(name).get();
     };
   }
 
   /** Creates mode-appropriate position-joint IO using SparkMax for real hardware. */
-  public static PositionJointIO fromSparkMax(String name, PositionJointHardwareConfig config) {
+  public static PositionJointIO fromSparkMax(
+      String name, PositionJointHardwareConfig config, JointSimulationConfig simulation) {
     return switch (Constants.currentMode) {
       case REAL -> new PositionJointIOSparkMax(name, config);
       case SIM -> new PositionJointIOSimSparkMax(
-          name, config, DCMotor.getNEO(config.canIds().length));
+          name, config, simulation, DCMotor.getNEO(config.canIds().length));
       default -> replayFactory(name).get();
     };
   }
 
   /** Creates mode-appropriate position-joint IO using TalonFX for real hardware. */
-  public static PositionJointIO fromTalonFX(String name, PositionJointHardwareConfig config) {
+  public static PositionJointIO fromTalonFX(
+      String name, PositionJointHardwareConfig config, JointSimulationConfig simulation) {
     return switch (Constants.currentMode) {
       case REAL -> new PositionJointIOTalonFX(name, config);
       case SIM -> new PositionJointIOSimTalonFX(
-          name, config, DCMotor.getKrakenX60Foc(config.canIds().length));
+          name, config, simulation, DCMotor.getKrakenX60Foc(config.canIds().length));
       default -> replayFactory(name).get();
     };
   }

@@ -19,6 +19,9 @@ public interface DriveMotorIO {
     public double[] motorAccelerations = {0.0};
 
     public double[] motorVoltages = {0.0};
+    /** Measured supply voltage, separately from applied motor voltage. */
+    public double[] motorSupplyVoltages = {0.0};
+
     public double[] motorCurrents = {0.0};
 
     public double[] odometryTimestamps = new double[] {};
