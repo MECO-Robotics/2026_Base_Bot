@@ -14,6 +14,10 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 class MigrationTest {
+  private static final PositionJointConstants.PositionJointGains TEST_GAINS =
+      new PositionJointConstants.PositionJointGains(
+          1.5, 0, 0, 0.5, 1, 2, 0, 10, 20, 0, Math.PI, 0.2, 0);
+
   @BeforeAll
   static void initializeHal() {
     assertTrue(HAL.initialize(500, 0));
@@ -34,7 +38,7 @@ class MigrationTest {
       inputs.outputPosition = measured;
     }
 
-    public void setPosition(double position, double velocity) {
+    public void setPosition(double position) {
       goal = position;
       positionCalls++;
     }
@@ -51,7 +55,7 @@ class MigrationTest {
   @Test
   void jointRetainsGoalAndOpenLoopOwnership() {
     JointIO io = new JointIO();
-    PositionJoint joint = new PositionJoint(io, PositionJointConstants.EXAMPLE_GAINS);
+    PositionJoint joint = new PositionJoint(io, TEST_GAINS);
     joint.periodic();
     joint.setPosition(1.0);
     joint.periodic();
@@ -70,7 +74,7 @@ class MigrationTest {
   @Test
   void complianceStaysReleasedUntilNewGoal() {
     JointIO io = new JointIO();
-    PositionJoint joint = new PositionJoint(io, PositionJointConstants.EXAMPLE_GAINS);
+    PositionJoint joint = new PositionJoint(io, TEST_GAINS);
     joint.periodic();
     joint.setPosition(1.0);
     joint.setComplianceAfterTarget(true);
@@ -103,21 +107,24 @@ class MigrationTest {
                       0.1,
                       1,
                       2,
-                      PoseObservationType.PHOTONVISION),
+                      PoseObservationType.PHOTONVISION,
+                      java.util.Set.of(1)),
                   new PoseObservation(
                       2.0,
                       new Pose3d(2, 2, 0, new Rotation3d()),
                       0.9,
                       1,
                       2,
-                      PoseObservationType.PHOTONVISION),
+                      PoseObservationType.PHOTONVISION,
+                      java.util.Set.of(1)),
                   new PoseObservation(
                       3.0,
                       new Pose3d(2, 2, 0, new Rotation3d()),
                       0,
                       0,
                       0,
-                      PoseObservationType.QUESTNAV)
+                      PoseObservationType.QUESTNAV,
+                      java.util.Set.of())
                 };
           }
         };

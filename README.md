@@ -1,4 +1,4 @@
-# Ninjineers 2025 Base Robot Code
+# Ninjineers 2026 Base Robot Code
 
 FRC Robot Code has gotten significantly more advanced in recent years with brushless motors, external CAN sensors, vision, and more complicated odometry. Ninjineers has realized that these advancements are not possible over the course of a single season so we created this base code to allow teams to focus on the emergent behavior of their robot instead of getting bogged down in the weeds of motor control. In developing this template we tried to create sensible defaults for TalonFX's and Spark Max's for motor control, and integrated Mechanical Advantage's Drivetrain and Vision projects (with modification to enable more modular configuration). These defaults work for us but you are free to create your own [IO layers](https://docs.advantagekit.org/data-flow/recording-inputs/io-interfaces) or bespoke Subsystems. We would love it if you create a pull request to share your code with other teams.
 
@@ -40,94 +40,19 @@ We split our robot into many small subsystems to allow for heavy reuse of subsys
 
 Many of what we want to think of as a single robot Subsystems will need to be represented as multiple Subsystems in code. For example: a shooter from Crescendo might have a set of left wheels and a set of right wheels that spin at different velocities to create spin. This should be represented as two Flywheels (one for the right and one for left). The differential velocity is a more complicated emergent behavior that should be controlled at the command level not the subsystem level.
 
-## Flywheel Constants
+## Mechanism configuration and units
 
-Flywheels have mechanism gains and motor configs:
+Angular mechanisms use output rotations and rotations/second. Linear joints use metres and
+metres/second. `gearRatio` always means motor rotations per output-shaft rotation; a linear
+joint converts through its drum circumference, `2 * Math.PI * outputRadiusMeters`.
 
-* Motor Configs:
+Hardware mapping, encoder calibration, and simulation physics are separate records. Pass the
+simulation record explicitly to `fromSparkMax` or `fromTalonFX`. Custom implementations use
+`fromMode(name, realSupplier, simSupplier)`; replay calls neither supplier.
 
-  * momentOfInertiaKgMetersSquared: Flywheel output inertia for simulation.
+See the [mechanism configuration guide](docs/source/mechanism-contracts.md) for gain units,
+encoder support, gravity phase, reset semantics, and complete downstream migration examples.
+Example constants are illustrative and require measurement and tuning on your robot.
 
-  * canIds: List of canIDs for motors in group. First canID will be master
-
-  * reversed: Reverse config for each motor: first boolean will reverse the master motor, the next booleans will reverse the follower motors relative to the master motor
-
-  * gearRatio: ratio of motor revolutions (rotations) to mechanism revolutions (rotations or radians)
-
-  * canBus: For TalonFX can be name of CANivore or "rio", unused on SparkMax
-
-* Gains:
-
-  Feedback:
-
-  * kP: (volts / rotation / second)
-
-  * kI: (volts / rotation)
-
-  * kD: (volts / rotation / second^2)
-
-  Feedforward:
-
-  * kS: (volts)
-
-  * kV: (volts / rotation / second)
-
-  * kA: (volts / rotation / second^2) (Not recommended to be non 0) (Not used in SparkMax control)
-
-  Tolerance:
-
-  * kTolerance: Velocity tolerance for mechanism to be considered at setpoint
-
-## PositionJoint Constants
-
-* HardwareConfig
-  * canIds: List of canIDs for motors in group. First canID will be master
-
-  * reversed: Reverse config for each motor: first boolean will reverse entire group, next booleans are all relative to master motor
-
-  * gearRatio: ratio of motor revolutions (rotations) to mechanism units, e.g. rotations, radians, or meters.
-
-  * currentLimit: current limit of the motor (Amps)
-
-  * mechanismType: `MechanismType.ROTATIONAL` for pivots or `MechanismType.LINEAR` for elevators. This selects cosine or constant gravity compensation, respectively.
-
-  * momentOfInertiaKgMetersSquared: Equivalent motor/input-shaft inertia used by joint simulation.
-
-  * outputRadiusMeters: Drum/pulley radius for linear simulation; use 0 for rotational joints.
-
-  * encoderType: Use EncoderType.INTERNAL to use the motor's internal encoder for relative positioning, EncoderType.EXTERNAL_CANCODER to use a CANCoder for absolute positioning Encoder_Type.EXTERNAL_DIO to use an external encoder connected to the Rio's DIO ports for absolute positioning, and Encoder_Type.EXTERNAL_SPARK to use an external encoder connected to the SPARK MAX motor controller for absolute positioning (not supported for TalonFX).
-
-  * encoderID: The CAN/DIO ID for the external encoder, can be left as 0 or -1 if using EncoderType.INTERNAL or EncoderType.EXTERNAL_SPARK.
-
-  * encoderOffset: The offset of the absolute encoder, in rotations. If using EncoderType.INTERNAL or EncoderType.EXTERNAL_SPARK an empty Rotation (new Rotation2d()) can be used.
-
-  * canBus: For TalonFX can be name of CANivore or "rio", unused on SparkMax
-
-* Gains
-
-  Feedback:
-  * kP: (volts / rotation / second)
-  * kI: (volts / rotation)
-  * kD: (volts / rotation / second^2)
-
-  Feedforward:
-  * kS: (volts)
-  * kV: (volts / rotation / second)
-  * kA: (volts / rotation / second^2) (Not recommended to be non 0) (Not used in SparkMax control)
-  * kG: (volts) Feedforward to compensate for effects of gravity
-
-  Trapezoidal:
-  * kMaxVelo: (rotation / second)
-  * kMaxAccel: (rotation / second^2)
-
-  Positional Bounds:
-  * kMinPosition: (rotation)
-  * kMaxPosition: (rotation)
-
-  Tolerance:
-  * kTolerance: Position tolerance for joint to be considered at setpoint
-
-  Default Setpoint:
-  * kDefaultSetpoint: (rotation) the setpoint the mechanism should go to upon intialization
-
-See [the Rebuilt migration notes](docs/rebuilt-migration.md) for imported changes, retained template behavior, source commits, and validation.
+See [the Rebuilt migration notes](docs/rebuilt-migration.md) for preserved source history,
+audit fixes, automated acceptance, and deferred Rebuilt ports.
