@@ -37,6 +37,15 @@ public class VisionConstants {
           Units.inchesToMeters(10.25),
           new Rotation3d(0.0, Units.degreesToRadians(-20), Units.degreesToRadians(0)));
 
+  // Optional tag filtering. Empty whitelist accepts tags from the whole field.
+  public static int minTagCountForOdometry = 1;
+  public static int minWhitelistedTagCountForOdometry = 0;
+  public static java.util.Set<Integer> odometryTagWhitelist = java.util.Set.of();
+
+  public static java.util.Set<Integer> getOdometryTagWhitelistForCurrentAlliance() {
+    return odometryTagWhitelist;
+  }
+
   // Basic filtering thresholds
   public static double maxAmbiguity = 0.3;
   public static double maxZError = 0.75;
@@ -58,4 +67,13 @@ public class VisionConstants {
   public static double linearStdDevMegatag2Factor = 0.5; // More stable than full 3D solve
   public static double angularStdDevMegatag2Factor =
       Double.POSITIVE_INFINITY; // No rotation data available
+  // QuestNav sim tuning
+  public static double questNavSimTranslationNoiseStdDevMetersPerSqrtSec = 0.0025;
+  public static double questNavSimYawNoiseStdDevRadPerSqrtSec = 0.001;
+  public static double questNavSimTranslationDriftXMetersPerSec = 0.0;
+  public static double questNavSimTranslationDriftYMetersPerSec = 0.0;
+  public static double questNavSimYawDriftRadPerSec = 0.0;
+  public static boolean questNavSimEnableAbsoluteCorrection = true;
+  public static double questNavSimTranslationCorrectionAlpha = 0.08;
+  public static double questNavSimYawCorrectionAlpha = 0.08;
 }
