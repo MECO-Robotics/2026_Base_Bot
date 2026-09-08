@@ -80,8 +80,16 @@ public class DriveMotorIOSim implements DriveMotorIO {
     }
 
     // Update simulation state
-    sim.setInputVoltage(MathUtil.clamp(driveAppliedVolts, -12.0, 12.0));
+    double appliedVoltage =
+        edu.wpi.first.wpilibj.DriverStation.isEnabled()
+            ? MathUtil.clamp(
+                driveAppliedVolts,
+                -edu.wpi.first.wpilibj.RobotController.getBatteryVoltage(),
+                edu.wpi.first.wpilibj.RobotController.getBatteryVoltage())
+            : 0;
+    sim.setInputVoltage(appliedVoltage);
     sim.update(0.02);
+    frc.robot.sim.SimulationPower.report(sim, sim.getCurrentDrawAmps());
 
     // Update drive inputs
     inputs.velocityRotationsPerSecond = sim.getAngularVelocity().in(RotationsPerSecond);
@@ -93,8 +101,8 @@ public class DriveMotorIOSim implements DriveMotorIO {
       motorsConnected[i] = true;
       motorPositions[i] = sim.getAngularPositionRotations();
       motorVelocities[i] = sim.getAngularVelocity().in(RotationsPerSecond);
-      motorVoltages[i] = driveAppliedVolts;
-      motorCurrents[i] = sim.getCurrentDrawAmps();
+      motorVoltages[i] = appliedVoltage;
+      motorCurrents[i] = sim.getCurrentDrawAmps() / config.canIds().length;
     }
 
     inputs.motorsConnected = motorsConnected;
@@ -103,6 +111,9 @@ public class DriveMotorIOSim implements DriveMotorIO {
     inputs.motorVelocities = motorVelocities;
 
     inputs.motorVoltages = motorVoltages;
+    inputs.motorSupplyVoltages = new double[motorVoltages.length];
+    java.util.Arrays.fill(
+        inputs.motorSupplyVoltages, edu.wpi.first.wpilibj.RobotController.getBatteryVoltage());
     inputs.motorCurrents = motorCurrents;
 
     // Update odometry inputs (50Hz because high-frequency odometry in sim doesn't matter)

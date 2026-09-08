@@ -90,7 +90,9 @@ public class Robot extends LoggedRobot {
     // finished or interrupted commands, and running subsystem periodic() methods.
     // This must be called from the robot's periodic block in order for anything in
     // the Command-based framework to work.
+    if (Constants.currentMode == Constants.Mode.SIM) frc.robot.sim.SimulationPower.beginCycle();
     CommandScheduler.getInstance().run();
+    if (Constants.currentMode == Constants.Mode.SIM) frc.robot.sim.SimulationPower.endCycle();
 
     // Return to non-RT thread priority (do not modify the first argument)
     // Threads.setCurrentThreadPriority(false, 10);

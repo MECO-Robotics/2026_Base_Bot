@@ -82,8 +82,16 @@ public class AzimuthMotorIOSim implements AzimuthMotorIO {
     }
 
     // Update simulation state
-    sim.setInputVoltage(MathUtil.clamp(appliedVolts, -12.0, 12.0));
+    double appliedVoltage =
+        edu.wpi.first.wpilibj.DriverStation.isEnabled()
+            ? MathUtil.clamp(
+                appliedVolts,
+                -edu.wpi.first.wpilibj.RobotController.getBatteryVoltage(),
+                edu.wpi.first.wpilibj.RobotController.getBatteryVoltage())
+            : 0;
+    sim.setInputVoltage(appliedVoltage);
     sim.update(0.02);
+    frc.robot.sim.SimulationPower.report(sim, sim.getCurrentDrawAmps());
 
     // Update drive inputs
     inputs.velocityRotationsPerSecond = sim.getAngularVelocity().in(RotationsPerSecond);
@@ -97,7 +105,7 @@ public class AzimuthMotorIOSim implements AzimuthMotorIO {
       motorPositions[i] = sim.getAngularPositionRotations();
       motorVelocities[i] = sim.getAngularVelocity().in(RotationsPerSecond);
       motorVoltages[i] = appliedVolts;
-      motorCurrents[i] = sim.getCurrentDrawAmps();
+      motorCurrents[i] = sim.getCurrentDrawAmps() / config.canIds().length;
     }
 
     inputs.motorsConnected = motorsConnected;
@@ -106,6 +114,9 @@ public class AzimuthMotorIOSim implements AzimuthMotorIO {
     inputs.motorVelocities = motorVelocities;
 
     inputs.motorVoltages = motorVoltages;
+    inputs.motorSupplyVoltages = new double[motorVoltages.length];
+    java.util.Arrays.fill(
+        inputs.motorSupplyVoltages, edu.wpi.first.wpilibj.RobotController.getBatteryVoltage());
     inputs.motorCurrents = motorCurrents;
 
     // Update odometry inputs (50Hz because high-frequency odometry in sim doesn't matter)

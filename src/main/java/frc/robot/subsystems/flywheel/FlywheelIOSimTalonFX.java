@@ -20,15 +20,16 @@ import com.ctre.phoenix6.signals.MotorAlignmentValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.system.plant.LinearSystemId;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotController;
-import edu.wpi.first.wpilibj.simulation.BatterySim;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
-import edu.wpi.first.wpilibj.simulation.RoboRioSim;
 import frc.robot.constants.types.FlywheelConstants.FlywheelGains;
 import frc.robot.constants.types.FlywheelConstants.FlywheelHardwareConfig;
+import frc.robot.constants.types.FlywheelConstants.FlywheelSimulationConfig;
+import frc.robot.sim.SimulationPower;
 
 /** TalonFX-backed simulation implementation of {@link FlywheelIO}. */
-public class FlywheelIOSimTalonFX implements FlywheelIO {
+public class FlywheelIOSimTalonFX implements FlywheelIO, AutoCloseable {
   private final String name;
   private final FlywheelHardwareConfig config;
   private final DCMotorSim plant;
@@ -43,7 +44,11 @@ public class FlywheelIOSimTalonFX implements FlywheelIO {
   private final double[] motorCurrents;
   private double velocitySetpoint = 0.0;
 
-  public FlywheelIOSimTalonFX(String name, FlywheelHardwareConfig config, DCMotor simMotorModel) {
+  public FlywheelIOSimTalonFX(
+      String name,
+      FlywheelHardwareConfig config,
+      FlywheelSimulationConfig simulation,
+      DCMotor simMotorModel) {
     this.name = name;
     this.config = config;
     int numMotors = config.canIds().length;
@@ -58,7 +63,7 @@ public class FlywheelIOSimTalonFX implements FlywheelIO {
     plant =
         new DCMotorSim(
             LinearSystemId.createDCMotorSystem(
-                simMotorModel, config.momentOfInertiaKgMetersSquared(), config.gearRatio()),
+                simMotorModel, simulation.outputInertiaKgMetersSquared(), config.gearRatio()),
             simMotorModel);
 
     CANBus canBus = new CANBus(config.canBus());
@@ -81,9 +86,26 @@ public class FlywheelIOSimTalonFX implements FlywheelIO {
                     .withSupplyCurrentLimit(config.currentLimit())
                     .withSupplyCurrentLimitEnable(true));
     motors[0].getConfigurator().apply(leaderConfig);
+    motors[0].getSimState().Orientation =
+        config.reversed()[0]
+            ? com.ctre.phoenix6.sim.ChassisReference.Clockwise_Positive
+            : com.ctre.phoenix6.sim.ChassisReference.CounterClockwise_Positive;
     motors[0].getSimState().setMotorType(com.ctre.phoenix6.sim.TalonFXSimState.MotorType.KrakenX60);
     for (int i = 1; i < numMotors; i++) {
       motors[i] = new TalonFX(config.canIds()[i], canBus);
+      motors[i]
+          .getConfigurator()
+          .apply(
+              new TalonFXConfiguration()
+                  .withMotorOutput(new MotorOutputConfigs().withNeutralMode(NeutralModeValue.Coast))
+                  .withCurrentLimits(
+                      new CurrentLimitsConfigs()
+                          .withSupplyCurrentLimit(config.currentLimit())
+                          .withSupplyCurrentLimitEnable(true)));
+      motors[i].getSimState().Orientation =
+          (config.reversed()[0] ^ config.reversed()[i])
+              ? com.ctre.phoenix6.sim.ChassisReference.Clockwise_Positive
+              : com.ctre.phoenix6.sim.ChassisReference.CounterClockwise_Positive;
       MotorAlignmentValue alignment =
           config.reversed()[i] ? MotorAlignmentValue.Opposed : MotorAlignmentValue.Aligned;
       motors[i].setControl(new Follower(motors[0].getDeviceID(), alignment));
@@ -99,13 +121,18 @@ public class FlywheelIOSimTalonFX implements FlywheelIO {
     double measuredPosition = plant.getAngularPositionRotations();
     double measuredVelocity = plant.getAngularVelocity().in(RotationsPerSecond);
     syncTalonSimState(measuredPosition, measuredVelocity, availableVoltage);
-    double appliedVoltage = motors[0].getSimState().getMotorVoltage();
-    plant.setInputVoltage(appliedVoltage);
+    double appliedVoltage =
+        DriverStation.isEnabled() ? motors[0].getSimState().getMotorVoltage() : 0;
+    plant.setInputVoltage(
+        Math.abs(appliedVoltage) < 1e-9
+            ? plant.getAngularVelocityRadPerSec()
+                * config.gearRatio()
+                / plant.getGearbox().KvRadPerSecPerVolt
+            : appliedVoltage);
     plant.update(0.02);
 
-    double loadedBatteryVoltage =
-        BatterySim.calculateDefaultBatteryLoadedVoltage(plant.getCurrentDrawAmps());
-    RoboRioSim.setVInVoltage(loadedBatteryVoltage);
+    SimulationPower.report(plant, plant.getCurrentDrawAmps());
+    double loadedBatteryVoltage = availableVoltage;
 
     measuredPosition = plant.getAngularPositionRotations();
     measuredVelocity = plant.getAngularVelocity().in(RotationsPerSecond);
@@ -123,13 +150,15 @@ public class FlywheelIOSimTalonFX implements FlywheelIO {
       motorVelocities[i] = measuredVelocity;
       motorAccelerations[i] = measuredAcceleration;
       motorVoltages[i] = appliedVoltage;
-      motorCurrents[i] = plant.getCurrentDrawAmps();
+      motorCurrents[i] = plant.getCurrentDrawAmps() / config.canIds().length;
     }
 
     inputs.motorPositions = motorPositions;
     inputs.motorVelocities = motorVelocities;
     inputs.motorAccelerations = motorAccelerations;
     inputs.motorVoltages = motorVoltages;
+    inputs.motorSupplyVoltages = new double[motorVoltages.length];
+    java.util.Arrays.fill(inputs.motorSupplyVoltages, availableVoltage);
     inputs.motorCurrents = motorCurrents;
   }
 
@@ -160,6 +189,11 @@ public class FlywheelIOSimTalonFX implements FlywheelIO {
         .getConfigurator()
         .apply(new MotionMagicConfigs().withMotionMagicAcceleration(gains.kMaxAccel()));
     System.out.println(name + " gains set to " + gains);
+  }
+
+  @Override
+  public void close() {
+    for (var motor : motors) motor.close();
   }
 
   @Override
