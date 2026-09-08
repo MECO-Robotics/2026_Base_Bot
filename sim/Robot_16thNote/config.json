@@ -1,0 +1,15 @@
+{
+  "name": "16th Note",
+  "rotations": [
+    {
+      "axis": "x",
+      "degrees": 90
+    }
+  ],
+  "position": [
+    -0.1397,
+    -0.1397,
+    0
+  ],
+  "cameras": []
+}
