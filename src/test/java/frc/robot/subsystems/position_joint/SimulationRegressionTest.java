@@ -57,6 +57,7 @@ class SimulationRegressionTest {
             Timer.delay(0.01);
             SimulationPower.beginCycle();
             io.updateInputs(in);
+            for (double supply : in.motorSupplyVoltages) assertEquals(12, supply, 0.01);
             assertEquals(
                 SimulationPower.totalCurrent(),
                 java.util.Arrays.stream(in.motorCurrents).sum(),

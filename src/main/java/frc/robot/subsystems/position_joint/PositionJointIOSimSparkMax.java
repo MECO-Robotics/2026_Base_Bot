@@ -20,7 +20,16 @@ public class PositionJointIOSimSparkMax extends PositionJointIOSparkMax {
     physics = new JointPhysics(config, simulation, motor);
     simulations = new SparkMaxSim[motors.length];
     for (int i = 0; i < motors.length; i++)
-      simulations[i] = new SparkMaxSim(motors[i], DCMotor.getNEO(1));
+      simulations[i] =
+          new SparkMaxSim(
+              motors[i],
+              new DCMotor(
+                  motor.nominalVoltageVolts,
+                  motor.stallTorqueNewtonMeters / motors.length,
+                  motor.stallCurrentAmps / motors.length,
+                  motor.freeCurrentAmps / motors.length,
+                  motor.freeSpeedRadPerSec,
+                  1));
     sync();
   }
 
@@ -54,6 +63,10 @@ public class PositionJointIOSimSparkMax extends PositionJointIOSparkMax {
     // REV simulation applied output is already in the configured positive mechanism direction.
     physics.step(volts, brake, enabled && (!voltageMode || Math.abs(commandedVoltage) > 1e-9));
     sync();
+    for (var simulation : simulations) {
+      simulation.setBusVoltage(battery);
+      simulation.setMotorCurrent(physics.current() / motors.length);
+    }
     super.updateInputs(in);
     commonInputs(in, physics.position(), physics.velocity());
     for (int i = 0; i < motors.length; i++) {

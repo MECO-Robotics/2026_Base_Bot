@@ -83,7 +83,16 @@ public class FlywheelIOSimSparkMax implements FlywheelIO, AutoCloseable {
           ResetMode.kNoResetSafeParameters,
           PersistMode.kNoPersistParameters);
     }
-    leaderSim = new SparkMaxSim(motors[0], simMotorModel);
+    leaderSim =
+        new SparkMaxSim(
+            motors[0],
+            new DCMotor(
+                simMotorModel.nominalVoltageVolts,
+                simMotorModel.stallTorqueNewtonMeters / numMotors,
+                simMotorModel.stallCurrentAmps / numMotors,
+                simMotorModel.freeCurrentAmps / numMotors,
+                simMotorModel.freeSpeedRadPerSec,
+                1));
   }
 
   @Override
@@ -102,6 +111,7 @@ public class FlywheelIOSimSparkMax implements FlywheelIO, AutoCloseable {
                 / plant.getGearbox().KvRadPerSecPerVolt
             : appliedVoltage);
     plant.update(0.02);
+    leaderSim.setMotorCurrent(plant.getCurrentDrawAmps() / motors.length);
 
     SimulationPower.report(plant, plant.getCurrentDrawAmps());
     double loadedBatteryVoltage = availableVoltage;

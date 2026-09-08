@@ -72,7 +72,9 @@ Use the source commits below to review generic behavior, adapt callers and retes
 | [a6e5355](https://github.com/MECO-Robotics/2026_Base_Bot/commit/a6e5355) | Share hardware/vendor-sim controls, configure real physical travel, use electrical neutral behavior and one aggregate simulation battery coordinator. Integrate Rebuilt's CTRE-generated drivetrain with the coordinator separately. |
 | [7be4ca5](https://github.com/MECO-Robotics/2026_Base_Bot/commit/7be4ca5) | Add per-observation IDs across producers/logging; share finite-value and whitelist validation with QuestNav absolute correction. Preserve Rebuilt camera transforms and intentional filtering policy. |
 
-Port the accompanying regression suite along with those behaviors. Defer competition CAN mappings,
+Also port the subsequent Spark simulation refinement: use one motor model and per-controller
+current for the native limiter while the physical plant and power coordinator retain aggregate
+current. Port the accompanying regression suite along with those behaviors. Defer competition CAN mappings,
 mechanism limits/gains, transforms, controller bindings, autonomous configuration and tuning changes
 until a Rebuilt-specific review and physical validation. Limelight coordinate conversion is retained.
 
