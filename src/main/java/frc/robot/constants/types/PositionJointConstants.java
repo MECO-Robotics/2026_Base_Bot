@@ -1,18 +1,15 @@
 package frc.robot.constants.types;
 
-import edu.wpi.first.math.geometry.Rotation2d;
+import java.util.Objects;
 
-/** Shared constants and configuration records for the position-joint subsystem. */
-public class PositionJointConstants {
-  /** Gravity model used by feedforward/controller configuration. */
+/** Angular positions are rotations; linear positions are metres. All rates are per second. */
+public final class PositionJointConstants {
   public enum GravityType {
     CONSTANT,
     COSINE,
-    // Not supported by TalonFX
     SINE
   }
 
-  /** Supported sensor sources for mechanism position. */
   public enum EncoderType {
     INTERNAL,
     EXTERNAL_CANCODER,
@@ -21,13 +18,12 @@ public class PositionJointConstants {
     EXTERNAL_SPARK
   }
 
-  /** Physical output type for simulation modeling. */
   public enum MechanismType {
     ROTATIONAL,
     LINEAR
   }
 
-  /** Closed-loop tuning values and profiling constraints for a position joint. */
+  /** Gains use volts per mechanism unit (and its time derivatives), for both vendors. */
   public record PositionJointGains(
       double kP,
       double kI,
@@ -41,72 +37,168 @@ public class PositionJointConstants {
       double kMinPosition,
       double kMaxPosition,
       double kTolerance,
-      double kDefaultSetpoint) {}
+      double kDefaultSetpoint) {
+    public PositionJointGains {
+      for (double v :
+          new double[] {
+            kP,
+            kI,
+            kD,
+            kS,
+            kG,
+            kV,
+            kA,
+            kMaxVelo,
+            kMaxAccel,
+            kMinPosition,
+            kMaxPosition,
+            kTolerance,
+            kDefaultSetpoint
+          }) if (!Double.isFinite(v)) throw new IllegalArgumentException("Gains must be finite");
+      if (kMaxVelo <= 0
+          || kMaxAccel <= 0
+          || kTolerance <= 0
+          || kMinPosition >= kMaxPosition
+          || kDefaultSetpoint < kMinPosition
+          || kDefaultSetpoint > kMaxPosition)
+        throw new IllegalArgumentException("Invalid joint constraints");
+    }
+  }
 
-  // Position Joint Gear Ratio should be multiplied by Math.PI * 2 for rotation
-  // joints to convert
-  // from rotations to radians
-  /**
-   * Hardware mapping and mechanism-specific constants for one position joint instance.
-   *
-   * @param canIds CAN IDs of the motors in the flywheel mechanism, in order from closest to
-   *     furthest from the shooter.
-   * @param reversed Whether each motor is reversed. First boolean corresponds to clockwise /
-   *     positive, rest of the booleans correspond to whether each subsequent motor is reversed
-   *     relative to the first motor.
-   * @param gearRatio The gear ratio between the motor and the joint output (output speed / motor
-   *     speed). For rotation joints, this gear ratio should be multiplied by 2 * Math.PI to convert
-   *     from rotations to radians.
-   * @param momentOfInertiaKgMetersSquared Equivalent inertia reflected to the motor/input shaft in
-   *     kg*m^2 for sim modeling. Simulation code converts this back to output/load inertia using
-   *     the gear ratio when building the plant.
-   * @param currentLimit The current limit for the motors in amps.
-   * @param encoderType The type of encoder used for position feedback.
-   * @param encoderID The ID of the encoder. For external encoders, this is the CAN ID for / a
-   *     CANCoder or the DIO port for a digital encoder. For internal encoders, this can be set to 0
-   *     or ignored.
-   * @param mechanismType The physical output type. Rotational joints use angular simulation, while
-   *     linear joints use a linear/elevator model.
-   * @param outputRadiusMeters Output drum/pulley radius in meters for linear mechanisms. Rotational
-   *     joints should set this to 0.
-   * @param encoderOffset The offset to apply to the encoder reading to get the joint position / in
-   *     the correct reference frame. For example, if the joint's zero position corresponds to the
-   *     encoder reading of 0.5 rotations, this would be set to Rotation2d.fromRotations(0.5).
-   * @param canBus The CAN bus the motors are on, or an empty string for the rio bus.
-   */
+  /** Calibrated units = (directed sensor rotations + offsetRotations) * unitsPerRotation. */
+  public record EncoderCalibration(
+      EncoderType type, int id, double unitsPerRotation, double offsetRotations, boolean reversed) {
+    public EncoderCalibration {
+      Objects.requireNonNull(type);
+      if ((type == EncoderType.INTERNAL
+              && (unitsPerRotation != 1 || offsetRotations != 0 || reversed))
+          || ((type == EncoderType.EXTERNAL_CANCODER || type == EncoderType.EXTERNAL_CANCODER_PRO)
+              && id > 62)
+          || id < 0
+          || !Double.isFinite(unitsPerRotation)
+          || unitsPerRotation <= 0
+          || !Double.isFinite(offsetRotations))
+        throw new IllegalArgumentException("Invalid encoder calibration");
+    }
+
+    public static EncoderCalibration internal() {
+      return new EncoderCalibration(EncoderType.INTERNAL, 0, 1, 0, false);
+    }
+
+    public double calibrate(double rawRotations) {
+      return ((reversed ? -rawRotations : rawRotations) + offsetRotations) * unitsPerRotation;
+    }
+  }
+
+  /** gearRatio is motor rotations/output-shaft rotation. Calibration and physics are separate. */
   public record PositionJointHardwareConfig(
       int[] canIds,
       boolean[] reversed,
       double gearRatio,
-      double momentOfInertiaKgMetersSquared,
       int currentLimit,
-      EncoderType encoderType,
-      int encoderID,
+      String canBus,
       MechanismType mechanismType,
+      GravityType gravityType,
       double outputRadiusMeters,
-      Rotation2d encoderOffset,
-      String canBus) {
-    public GravityType gravityType() {
-      return mechanismType == MechanismType.LINEAR ? GravityType.CONSTANT : GravityType.COSINE;
+      EncoderCalibration encoder) {
+    public PositionJointHardwareConfig {
+      MotorConfigValidation.validate(canIds, reversed, gearRatio, currentLimit, canBus);
+      canIds = canIds.clone();
+      reversed = reversed.clone();
+      Objects.requireNonNull(mechanismType);
+      Objects.requireNonNull(gravityType);
+      Objects.requireNonNull(encoder);
+      if (!Double.isFinite(outputRadiusMeters)
+          || outputRadiusMeters < 0
+          || (mechanismType == MechanismType.LINEAR
+              && (outputRadiusMeters <= 0 || gravityType != GravityType.CONSTANT)))
+        throw new IllegalArgumentException(
+            "Linear joints require a drum radius and CONSTANT gravity");
+    }
+
+    @Override
+    public int[] canIds() {
+      return canIds.clone();
+    }
+
+    @Override
+    public boolean[] reversed() {
+      return reversed.clone();
+    }
+
+    public double unitsPerOutputRotation() {
+      return mechanismType == MechanismType.LINEAR ? 2 * Math.PI * outputRadiusMeters : 1;
+    }
+
+    public double motorRotationsPerUnit() {
+      return gearRatio / unitsPerOutputRotation();
+    }
+
+    public EncoderType encoderType() {
+      return encoder.type();
+    }
+
+    public int encoderID() {
+      return encoder.id();
+    }
+
+    public double gravityVoltage(double physicalPosition, double kG) {
+      return switch (gravityType) {
+        case CONSTANT -> kG;
+        case COSINE -> kG * Math.cos(physicalPosition * 2 * Math.PI);
+        case SINE -> kG * Math.sin(physicalPosition * 2 * Math.PI);
+      };
     }
   }
 
-  /** Reference tuning/config used as a template while creating new joints. */
-  public static final PositionJointGains EXAMPLE_GAINS =
-      new PositionJointGains(1.5, 0.0, 0.0, 0.5, 1.0, 2.0, 0.0, 10.0, 20.0, 0.0, Math.PI, 0.2, 0.0);
+  /** Physical limits are in mechanism units, inertia at the output shaft, mass in kg. */
+  public record JointSimulationConfig(
+      double outputInertiaKgMetersSquared,
+      double massKg,
+      double armLengthMeters,
+      double minPosition,
+      double maxPosition,
+      double initialPosition) {
+    public JointSimulationConfig {
+      for (double v :
+          new double[] {
+            outputInertiaKgMetersSquared,
+            massKg,
+            armLengthMeters,
+            minPosition,
+            maxPosition,
+            initialPosition
+          })
+        if (!Double.isFinite(v))
+          throw new IllegalArgumentException("Simulation parameters must be finite");
+      if (outputInertiaKgMetersSquared <= 0
+          || massKg <= 0
+          || armLengthMeters <= 0
+          || minPosition >= maxPosition
+          || initialPosition < minPosition
+          || initialPosition > maxPosition)
+        throw new IllegalArgumentException("Invalid physical simulation parameters");
+    }
 
-  /** Reference hardware config used as a template while creating new joints. */
+    public void validateLimits(double min, double max) {
+      if (min < minPosition || max > maxPosition)
+        throw new IllegalArgumentException("Software limits exceed physical travel");
+    }
+  }
+  // Illustrative values only: measure and tune the actual mechanism before enabling it.
+  public static final PositionJointGains EXAMPLE_GAINS =
+      new PositionJointGains(4, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0.5, 0.01, 0);
   public static final PositionJointHardwareConfig EXAMPLE_CONFIG =
       new PositionJointHardwareConfig(
           new int[] {10},
-          new boolean[] {true},
-          85.33333 * 2 * Math.PI,
-          0.01,
+          new boolean[] {false},
+          85.33333,
           40,
-          EncoderType.EXTERNAL_CANCODER,
-          11,
+          "",
           MechanismType.ROTATIONAL,
-          0.0,
-          Rotation2d.fromRotations(0.5),
-          "");
+          GravityType.COSINE,
+          0,
+          EncoderCalibration.internal());
+  public static final JointSimulationConfig EXAMPLE_SIMULATION =
+      new JointSimulationConfig(0.025, 1, 0.5, 0, 0.5, 0);
 }

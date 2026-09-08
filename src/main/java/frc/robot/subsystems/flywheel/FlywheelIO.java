@@ -4,6 +4,7 @@ import edu.wpi.first.math.system.plant.DCMotor;
 import frc.robot.constants.Constants;
 import frc.robot.constants.types.FlywheelConstants.FlywheelGains;
 import frc.robot.constants.types.FlywheelConstants.FlywheelHardwareConfig;
+import frc.robot.constants.types.FlywheelConstants.FlywheelSimulationConfig;
 import java.util.function.Supplier;
 import org.littletonrobotics.junction.AutoLog;
 
@@ -32,6 +33,8 @@ public interface FlywheelIO {
 
     /** Per-motor applied voltage telemetry. */
     public double[] motorVoltages = {0.0};
+    /** Measured supply voltage, separately from applied motor voltage. */
+    public double[] motorSupplyVoltages = {0.0};
     /** Per-motor current draw telemetry. */
     public double[] motorCurrents = {0.0};
   }
@@ -59,39 +62,39 @@ public interface FlywheelIO {
         };
   }
 
-  /**
-   * Creates a mode-appropriate flywheel IO.
-   *
-   * <p>Returns the supplied real implementation on real hardware, inert IO in sim and replay. Use
-   * the vendor-specific factories below for physics simulation.
-   */
+  /** Selects an implementation without constructing unused hardware or physics. */
   public static FlywheelIO fromMode(
-      String name,
-      FlywheelHardwareConfig config,
-      Supplier<FlywheelIO> subsystemSupplier,
-      DCMotor simMotorModel) {
-    return switch (Constants.currentMode) {
-      case REAL -> subsystemSupplier.get();
-      case SIM -> replayFactory(name).get();
-      default -> replayFactory(name).get();
+      String name, Supplier<FlywheelIO> real, Supplier<FlywheelIO> sim) {
+    return selectMode(Constants.currentMode, name, real, sim);
+  }
+
+  public static FlywheelIO selectMode(
+      Constants.Mode mode, String name, Supplier<FlywheelIO> real, Supplier<FlywheelIO> sim) {
+    return switch (mode) {
+      case REAL -> real.get();
+      case SIM -> sim.get();
+      case REPLAY -> replayFactory(name).get();
     };
   }
 
   /** Creates mode-appropriate flywheel IO using SparkMax for real hardware. */
-  public static FlywheelIO fromSparkMax(String name, FlywheelHardwareConfig config) {
+  public static FlywheelIO fromSparkMax(
+      String name, FlywheelHardwareConfig config, FlywheelSimulationConfig simulation) {
     return switch (Constants.currentMode) {
       case REAL -> new FlywheelIOSparkMax(name, config);
-      case SIM -> new FlywheelIOSimSparkMax(name, config, DCMotor.getNEO(config.canIds().length));
+      case SIM -> new FlywheelIOSimSparkMax(
+          name, config, simulation, DCMotor.getNEO(config.canIds().length));
       default -> replayFactory(name).get();
     };
   }
 
   /** Creates mode-appropriate flywheel IO using TalonFX for real hardware. */
-  public static FlywheelIO fromTalonFX(String name, FlywheelHardwareConfig config) {
+  public static FlywheelIO fromTalonFX(
+      String name, FlywheelHardwareConfig config, FlywheelSimulationConfig simulation) {
     return switch (Constants.currentMode) {
       case REAL -> new FlywheelIOTalonFX(name, config);
       case SIM -> new FlywheelIOSimTalonFX(
-          name, config, DCMotor.getKrakenX60Foc(config.canIds().length));
+          name, config, simulation, DCMotor.getKrakenX60Foc(config.canIds().length));
       default -> replayFactory(name).get();
     };
   }
