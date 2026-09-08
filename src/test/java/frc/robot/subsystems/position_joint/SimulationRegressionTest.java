@@ -57,13 +57,15 @@ class SimulationRegressionTest {
             Timer.delay(0.01);
             SimulationPower.beginCycle();
             io.updateInputs(in);
-            for (double supply : in.motorSupplyVoltages)
-              assertEquals(edu.wpi.first.wpilibj.RobotController.getBatteryVoltage(), supply, 0.01);
             assertEquals(
                 SimulationPower.totalCurrent(),
                 java.util.Arrays.stream(in.motorCurrents).sum(),
                 1e-5);
           }
+          // Phoenix status frames arrive asynchronously; check settled telemetry, not the first
+          // frame.
+          for (double supply : in.motorSupplyVoltages)
+            assertEquals(edu.wpi.first.wpilibj.RobotController.getBatteryVoltage(), supply, 0.01);
           assertTrue(
               in.outputPosition > 0.25,
               "Positive voltage must move positive: Talon=" + talon + ", inverted=" + inverted);
