@@ -26,7 +26,7 @@ It supports:
 - Velocity control
 - Direct voltage control
 - Tunable feedforward and feedback gains
-- Slew-limited setpoint generation
+- Motion Magic/MAXMotion acceleration constraints handled by vendor IO
 
 ## PositionJoint
 
@@ -42,6 +42,10 @@ It supports:
 
 This is the subsystem you should reach for when the mechanism is fundamentally defined by where it should be, not just how fast it should spin.
 
+Joint position commands finish at tolerance and retain their goal afterward. An optional `complianceAfterTarget` argument releases the motor into coast at the target until a new goal is requested. Compliance is disabled by default. Direct voltage commands retain output ownership until the next position request.
+
+Flywheel and joint simulation implementations now live beside their hardware IO in `subsystems/flywheel` and `subsystems/position_joint`. Their `fromSparkMax` and `fromTalonFX` factories select real, simulated, or replay IO. Hardware configurations include simulation inertia; joints also specify `MechanismType` and an output radius for linear mechanisms.
+
 ## Vision
 
 The vision stack accepts one or more camera implementations and filters observations before passing them into a consumer, usually the drive pose estimator.
@@ -51,6 +55,8 @@ Important behavior:
 - Rejects invalid or out-of-bounds observations.
 - Scales measurement uncertainty from ambiguity, tag count, and target distance.
 - Logs accepted and rejected estimates for debugging.
+
+`VisionIO` provides mode-aware Limelight and QuestNav/PhotonVision factories, including simulation adapters. `VisionConstants` retains the template camera transforms. Tag filtering defaults to one tag with ambiguity checks and an empty whitelist; configure `odometryTagWhitelist` and minimum counts for your robot. QuestNav inertial observations do not require visible tags. These adapters are available for wiring into `RobotContainer`; the template does not instantiate a camera automatically.
 
 ## Sensors and game-piece detection
 
@@ -62,3 +68,5 @@ The repository also includes smaller building blocks for:
 - PathPlanner utilities
 
 Those classes are intentionally narrow. They are meant to be composed into higher-level robot behaviors rather than expanded into monolithic subsystems.
+
+`UnitInterpolatingMap` interpolates unit-aware measurements, clamps queries to the supplied range, and returns zero in the value unit when empty.

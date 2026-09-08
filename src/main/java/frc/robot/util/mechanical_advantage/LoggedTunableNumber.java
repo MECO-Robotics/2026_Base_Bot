@@ -107,7 +107,12 @@ public class LoggedTunableNumber implements DoubleSupplier {
    */
   public static void ifChanged(
       int id, Consumer<double[]> action, LoggedTunableNumber... tunableNumbers) {
-    if (Arrays.stream(tunableNumbers).anyMatch(tunableNumber -> tunableNumber.hasChanged(id))) {
+    boolean changed = false;
+    for (LoggedTunableNumber tunableNumber : tunableNumbers) {
+      // Sample every value so a short circuit cannot defer initialization across cycles.
+      changed |= tunableNumber.hasChanged(id);
+    }
+    if (changed) {
       action.accept(Arrays.stream(tunableNumbers).mapToDouble(LoggedTunableNumber::get).toArray());
     }
   }

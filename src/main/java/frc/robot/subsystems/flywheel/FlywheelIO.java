@@ -62,7 +62,8 @@ public interface FlywheelIO {
   /**
    * Creates a mode-appropriate flywheel IO.
    *
-   * <p>Returns the supplied real implementation on real hardware, inert IO in sim and replay. Use the vendor-specific factories below for physics simulation.
+   * <p>Returns the supplied real implementation on real hardware, inert IO in sim and replay. Use
+   * the vendor-specific factories below for physics simulation.
    */
   public static FlywheelIO fromMode(
       String name,

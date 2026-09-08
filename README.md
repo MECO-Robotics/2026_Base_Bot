@@ -46,6 +46,8 @@ Flywheels have mechanism gains and motor configs:
 
 * Motor Configs:
 
+  * momentOfInertiaKgMetersSquared: Flywheel output inertia for simulation.
+
   * canIds: List of canIDs for motors in group. First canID will be master
 
   * reversed: Reverse config for each motor: first boolean will reverse the master motor, the next booleans will reverse the follower motors relative to the master motor
@@ -87,7 +89,11 @@ Flywheels have mechanism gains and motor configs:
 
   * currentLimit: current limit of the motor (Amps)
 
-  * gravity: GravityType.CONSTANT for a mechanism where gravity acts in a constant way (e.g. turret or elevator), GravityType.COSINE for pivots with a 0 position horizontal, and GravityType.SINE for pivots with a 0 position vertical (not supported on TalonFX)
+  * mechanismType: `MechanismType.ROTATIONAL` for pivots or `MechanismType.LINEAR` for elevators. This selects cosine or constant gravity compensation, respectively.
+
+  * momentOfInertiaKgMetersSquared: Equivalent motor/input-shaft inertia used by joint simulation.
+
+  * outputRadiusMeters: Drum/pulley radius for linear simulation; use 0 for rotational joints.
 
   * encoderType: Use EncoderType.INTERNAL to use the motor's internal encoder for relative positioning, EncoderType.EXTERNAL_CANCODER to use a CANCoder for absolute positioning Encoder_Type.EXTERNAL_DIO to use an external encoder connected to the Rio's DIO ports for absolute positioning, and Encoder_Type.EXTERNAL_SPARK to use an external encoder connected to the SPARK MAX motor controller for absolute positioning (not supported for TalonFX).
 
@@ -123,3 +129,5 @@ Flywheels have mechanism gains and motor configs:
 
   Default Setpoint:
   * kDefaultSetpoint: (rotation) the setpoint the mechanism should go to upon intialization
+
+See [the Rebuilt migration notes](docs/rebuilt-migration.md) for imported changes, retained template behavior, source commits, and validation.
