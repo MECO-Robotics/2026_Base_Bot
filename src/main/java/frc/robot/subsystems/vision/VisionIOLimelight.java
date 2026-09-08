@@ -192,7 +192,9 @@ public class VisionIOLimelight implements VisionIO {
       return null;
     }
 
+    Set<Integer> observationIds = new HashSet<>();
     for (int i = 11; i + 6 < rawLLArray.length; i += 7) {
+      observationIds.add((int) rawLLArray[i]);
       tagIds.add((int) rawLLArray[i]);
     }
 
@@ -204,7 +206,8 @@ public class VisionIOLimelight implements VisionIO {
         ambiguity,
         tagCount,
         rawLLArray[9],
-        type);
+        type,
+        observationIds);
   }
 
   private static int getTagCount(double[] rawLLArray) {

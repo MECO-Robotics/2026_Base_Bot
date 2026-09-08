@@ -46,7 +46,10 @@ public class VisionIOPhotonVisionTrig implements VisionIO {
     for (var result : camera.getAllUnreadResults()) {
       // Update latest target observation
       // Note:
-      if (result.hasTargets()) {
+      if (result.hasTargets()
+          && VisionConstants.aprilTagLayout
+              .getTagPose(result.getBestTarget().fiducialId)
+              .isPresent()) {
         inputs.latestTargetObservation =
             new TargetObservation(
                 Rotation2d.fromDegrees(result.getBestTarget().getYaw()),
@@ -96,7 +99,8 @@ public class VisionIOPhotonVisionTrig implements VisionIO {
                 result.getBestTarget().getPoseAmbiguity(),
                 1,
                 distance,
-                PoseObservationType.PHOTONVISIONTRIG));
+                PoseObservationType.PHOTONVISIONTRIG,
+                java.util.Set.of(result.getBestTarget().fiducialId)));
       } else {
         inputs.latestTargetObservation =
             new TargetObservation(new Rotation2d(), new Rotation2d(), 0);

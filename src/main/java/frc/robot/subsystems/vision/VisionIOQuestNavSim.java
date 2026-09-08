@@ -7,9 +7,6 @@ import edu.wpi.first.math.geometry.Pose3d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.wpilibj.Timer;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
 import java.util.function.Supplier;
 import org.littletonrobotics.junction.Logger;
 
@@ -17,7 +14,7 @@ import org.littletonrobotics.junction.Logger;
 public class VisionIOQuestNavSim implements VisionIO {
   private final Supplier<Pose2d> groundTruthPoseSupplier;
   private final VisionIO absoluteVisionIO;
-  private final VisionIOInputsAutoLogged absoluteInputs = new VisionIOInputsAutoLogged();
+  private final VisionIOInputsLogged absoluteInputs = new VisionIOInputsLogged();
 
   private Pose2d inertialPose = null;
   private Pose2d lastGroundTruthPose = null;
@@ -100,50 +97,23 @@ public class VisionIOQuestNavSim implements VisionIO {
     inputs.poseObservations =
         new PoseObservation[] {
           new PoseObservation(
-              nowSeconds, new Pose3d(inertialPose), 0.0, -1, 0.0, PoseObservationType.QUESTNAV)
+              nowSeconds,
+              new Pose3d(inertialPose),
+              0.0,
+              -1,
+              0.0,
+              PoseObservationType.QUESTNAV,
+              java.util.Set.of())
         };
     inputs.tagIds = new int[0];
 
     Logger.recordOutput("QuestNav/Sim/InertialPose", new Pose3d(inertialPose));
   }
 
-  private PoseObservation[] filterAbsoluteObservations(VisionIOInputs absoluteInputs) {
-    Set<Integer> whitelistedTagIds = getOdometryTagWhitelistForCurrentAlliance();
-    int observedWhitelistedTagCount = 0;
-    for (int tagId : absoluteInputs.tagIds) {
-      if (whitelistedTagIds.isEmpty() || whitelistedTagIds.contains(tagId)) {
-        observedWhitelistedTagCount++;
-      }
-    }
-    boolean hasEnoughWhitelistedTags =
-        observedWhitelistedTagCount >= minWhitelistedTagCountForOdometry;
-
-    List<PoseObservation> filteredObservations = new ArrayList<>();
-    for (PoseObservation observation : absoluteInputs.poseObservations) {
-      if (isValidAbsoluteObservation(observation, whitelistedTagIds, hasEnoughWhitelistedTags)) {
-        filteredObservations.add(observation);
-      }
-    }
-    return filteredObservations.toArray(new PoseObservation[0]);
-  }
-
-  private boolean isValidAbsoluteObservation(
-      PoseObservation observation,
-      Set<Integer> whitelistedTagIds,
-      boolean hasEnoughWhitelistedTags) {
-    if (observation.type() == PoseObservationType.QUESTNAV) {
-      return false;
-    }
-
-    boolean enforceWhitelistedTagMinimum =
-        !whitelistedTagIds.isEmpty() && minWhitelistedTagCountForOdometry > 0;
-    return observation.tagCount() >= minTagCountForOdometry
-        && (observation.tagCount() != 1 || observation.ambiguity() <= maxAmbiguity)
-        && (!enforceWhitelistedTagMinimum || hasEnoughWhitelistedTags)
-        && Math.abs(observation.pose().getZ()) <= maxZError
-        && observation.pose().getX() >= 0.0
-        && observation.pose().getX() <= aprilTagLayout.getFieldLength()
-        && observation.pose().getY() >= 0.0
-        && observation.pose().getY() <= aprilTagLayout.getFieldWidth();
+  private PoseObservation[] filterAbsoluteObservations(VisionIOInputs in) {
+    var allowed = getOdometryTagWhitelistForCurrentAlliance();
+    return java.util.Arrays.stream(in.poseObservations)
+        .filter(p -> VisionObservationFilter.accepts(p, allowed, false))
+        .toArray(PoseObservation[]::new);
   }
 }
