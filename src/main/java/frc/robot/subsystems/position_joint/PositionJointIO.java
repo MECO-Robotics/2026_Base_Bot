@@ -89,7 +89,8 @@ public interface PositionJointIO {
   /**
    * Creates a mode-appropriate position joint IO.
    *
-   * <p>Returns the supplied real implementation on real hardware, inert IO in sim and replay. Use the vendor-specific factories below for physics simulation.
+   * <p>Returns the supplied real implementation on real hardware, inert IO in sim and replay. Use
+   * the vendor-specific factories below for physics simulation.
    */
   public static PositionJointIO fromMode(
       String name,
