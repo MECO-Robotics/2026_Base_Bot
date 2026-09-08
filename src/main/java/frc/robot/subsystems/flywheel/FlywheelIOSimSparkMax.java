@@ -6,7 +6,6 @@ import static edu.wpi.first.units.Units.RotationsPerSecondPerSecond;
 import com.revrobotics.PersistMode;
 import com.revrobotics.ResetMode;
 import com.revrobotics.sim.SparkMaxSim;
-import com.revrobotics.spark.ClosedLoopSlot;
 import com.revrobotics.spark.SparkBase.ControlType;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
 import com.revrobotics.spark.SparkMax;
@@ -17,24 +16,22 @@ import com.revrobotics.spark.config.SparkBaseConfig;
 import com.revrobotics.spark.config.SparkMaxConfig;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.system.plant.LinearSystemId;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotController;
-import edu.wpi.first.wpilibj.simulation.BatterySim;
 import edu.wpi.first.wpilibj.simulation.DCMotorSim;
-import edu.wpi.first.wpilibj.simulation.RoboRioSim;
 import frc.robot.constants.types.FlywheelConstants.FlywheelGains;
 import frc.robot.constants.types.FlywheelConstants.FlywheelHardwareConfig;
-import frc.robot.util.feedforwards.TunableSimpleMotorFeedforward;
+import frc.robot.constants.types.FlywheelConstants.FlywheelSimulationConfig;
+import frc.robot.sim.SimulationPower;
 
 /** SparkMax-backed simulation implementation of {@link FlywheelIO}. */
-public class FlywheelIOSimSparkMax implements FlywheelIO {
+public class FlywheelIOSimSparkMax implements FlywheelIO, AutoCloseable {
   private final String name;
   private final FlywheelHardwareConfig config;
   private final DCMotorSim plant;
   private final SparkMax[] motors;
   private final SparkBaseConfig leaderConfig;
   private final SparkMaxSim leaderSim;
-  private final TunableSimpleMotorFeedforward feedforward =
-      new TunableSimpleMotorFeedforward(0, 0, 0);
   private final boolean[] motorsConnected;
   private final double[] motorPositions;
   private final double[] motorVelocities;
@@ -44,7 +41,11 @@ public class FlywheelIOSimSparkMax implements FlywheelIO {
   private double velocitySetpoint = 0.0;
   private double measuredVelocity = 0.0;
 
-  public FlywheelIOSimSparkMax(String name, FlywheelHardwareConfig config, DCMotor simMotorModel) {
+  public FlywheelIOSimSparkMax(
+      String name,
+      FlywheelHardwareConfig config,
+      FlywheelSimulationConfig simulation,
+      DCMotor simMotorModel) {
     this.name = name;
     this.config = config;
     int numMotors = config.canIds().length;
@@ -59,7 +60,7 @@ public class FlywheelIOSimSparkMax implements FlywheelIO {
     plant =
         new DCMotorSim(
             LinearSystemId.createDCMotorSystem(
-                simMotorModel, config.momentOfInertiaKgMetersSquared(), config.gearRatio()),
+                simMotorModel, simulation.outputInertiaKgMetersSquared(), config.gearRatio()),
             simMotorModel);
 
     motors[0] = new SparkMax(config.canIds()[0], MotorType.kBrushless);
@@ -92,13 +93,18 @@ public class FlywheelIOSimSparkMax implements FlywheelIO {
     measuredVelocity = plant.getAngularVelocity().in(RotationsPerSecond);
 
     leaderSim.iterate(measuredVelocity, availableVoltage, 0.02);
-    double appliedVoltage = leaderSim.getAppliedOutput() * availableVoltage;
-    plant.setInputVoltage(appliedVoltage);
+    double appliedVoltage =
+        DriverStation.isEnabled() ? leaderSim.getAppliedOutput() * availableVoltage : 0;
+    plant.setInputVoltage(
+        Math.abs(appliedVoltage) < 1e-9
+            ? plant.getAngularVelocityRadPerSec()
+                * config.gearRatio()
+                / plant.getGearbox().KvRadPerSecPerVolt
+            : appliedVoltage);
     plant.update(0.02);
 
-    double loadedBatteryVoltage =
-        BatterySim.calculateDefaultBatteryLoadedVoltage(plant.getCurrentDrawAmps());
-    RoboRioSim.setVInVoltage(loadedBatteryVoltage);
+    SimulationPower.report(plant, plant.getCurrentDrawAmps());
+    double loadedBatteryVoltage = availableVoltage;
 
     measuredPosition = plant.getAngularPositionRotations();
     measuredVelocity = plant.getAngularVelocity().in(RotationsPerSecond);
@@ -115,13 +121,15 @@ public class FlywheelIOSimSparkMax implements FlywheelIO {
       motorVelocities[i] = measuredVelocity;
       motorAccelerations[i] = measuredAcceleration;
       motorVoltages[i] = appliedVoltage;
-      motorCurrents[i] = plant.getCurrentDrawAmps();
+      motorCurrents[i] = plant.getCurrentDrawAmps() / config.canIds().length;
     }
 
     inputs.motorPositions = motorPositions;
     inputs.motorVelocities = motorVelocities;
     inputs.motorAccelerations = motorAccelerations;
     inputs.motorVoltages = motorVoltages;
+    inputs.motorSupplyVoltages = new double[motorVoltages.length];
+    java.util.Arrays.fill(inputs.motorSupplyVoltages, availableVoltage);
     inputs.motorCurrents = motorCurrents;
   }
 
@@ -130,11 +138,7 @@ public class FlywheelIOSimSparkMax implements FlywheelIO {
     velocitySetpoint = velocity;
     motors[0]
         .getClosedLoopController()
-        .setSetpoint(
-            velocitySetpoint,
-            ControlType.kMAXMotionVelocityControl,
-            ClosedLoopSlot.kSlot0,
-            feedforward.calculateWithVelocities(measuredVelocity, velocity));
+        .setSetpoint(velocitySetpoint, ControlType.kMAXMotionVelocityControl);
   }
 
   @Override
@@ -145,14 +149,25 @@ public class FlywheelIOSimSparkMax implements FlywheelIO {
   @Override
   public void setGains(FlywheelGains gains) {
     motors[0].configure(
-        leaderConfig.apply(
-            new ClosedLoopConfig()
-                .pid(gains.kP(), gains.kI(), gains.kD())
-                .apply(new MAXMotionConfig().maxAcceleration(gains.kMaxAccel()))),
+        leaderConfig
+            .voltageCompensation(12)
+            .apply(
+                new ClosedLoopConfig()
+                    .pid(gains.kP() / 12, gains.kI() / 12000, gains.kD() * 1000 / 12)
+                    .apply(
+                        new com.revrobotics.spark.config.FeedForwardConfig()
+                            .kS(gains.kS())
+                            .kV(gains.kV())
+                            .kA(gains.kA()))
+                    .apply(new MAXMotionConfig().maxAcceleration(gains.kMaxAccel()))),
         ResetMode.kNoResetSafeParameters,
         PersistMode.kNoPersistParameters);
-    feedforward.setGains(gains.kS(), gains.kV(), gains.kA());
     System.out.println(name + " gains set to " + gains);
+  }
+
+  @Override
+  public void close() {
+    for (var motor : motors) motor.close();
   }
 
   @Override
